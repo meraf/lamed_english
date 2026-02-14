@@ -1,12 +1,19 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Added useEffect
 import Link from 'next/link';
+import { usePathname } from 'next/navigation'; // Added usePathname
 import { Menu, X, LogOut, User as UserIcon } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { data: session, status } = useSession();
+  const pathname = usePathname(); // Get current URL path
+
+  // AUTOMATICALLY CLOSE MENU WHEN URL CHANGES
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
 
   return (
     <nav className="bg-slate-900 text-white sticky top-0 z-50 shadow-lg">
@@ -38,19 +45,18 @@ const Navbar = () => {
                   <span className="text-sm font-bold text-white">{session.user?.name?.split(' ')[0]}</span>
                 </div>
 
-                
                 <div className="group relative">
                   <button className="w-10 h-10 rounded-full bg-slate-800 border-2 border-yellow-400 flex items-center justify-center overflow-hidden hover:scale-105 transition-transform">
                    {session.user?.image ? (
-  <img 
-    src={session.user.image} 
-    alt="User" 
-    className="w-full h-full object-cover"
-    referrerPolicy="no-referrer" 
-  />
-) : (
-  <UserIcon size={20} className="text-yellow-400" />
-)}
+                      <img 
+                        src={session.user.image} 
+                        alt="User" 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer" 
+                      />
+                    ) : (
+                      <UserIcon size={20} className="text-yellow-400" />
+                    )}
                   </button>
                   {/* Dropdown on Hover */}
                   <div className="absolute right-0 top-full pt-2 hidden group-hover:block w-48">
