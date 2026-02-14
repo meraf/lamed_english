@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache"
 
 /**
  * Action to enroll a student in a course
+ * Updated for Explicit Many-to-Many (Enrollment Model)
  */
 export async function enrollInCourse(courseId: string) {
   const session = await getServerSession(authOptions)
@@ -15,14 +16,34 @@ export async function enrollInCourse(courseId: string) {
     throw new Error("You must be logged in to enroll")
   }
 
-  // We find the user by email and connect them to the course
-  // The field name 'enrolledCourses' must match your User model in schema.prisma
-  await prisma.user.update({
+  // 1. First, we need the User's ID (not just their email)
+  const user = await prisma.user.findUnique({
     where: { email: session.user.email },
-    data: {
-      enrolledCourses: {
-        connect: { id: courseId }
+    select: { id: true }
+  })
+
+  if (!user) throw new Error("User not found")
+
+  // 2. Check if the user is already enrolled to prevent duplicates
+  const existingEnrollment = await prisma.enrollment.findUnique({
+    where: {
+      userId_courseId: {
+        userId: user.id,
+        courseId: courseId
       }
+    }
+  })
+
+  if (existingEnrollment) {
+    return { success: false, message: "Already enrolled" }
+  }
+
+  // 3. Create the Enrollment record
+  // This bridges the User and the Course
+  await prisma.enrollment.create({
+    data: {
+      userId: user.id,
+      courseId: courseId
     }
   })
 
@@ -38,10 +59,8 @@ export async function enrollInCourse(courseId: string) {
 export async function toggleLessonProgress(lessonId: string) {
   const session = await getServerSession(authOptions)
   
-  // 1. Security Check
   if (!session?.user?.email) throw new Error("Unauthorized")
 
-  // 2. Find the User ID from the email
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
     select: { id: true }
@@ -49,7 +68,6 @@ export async function toggleLessonProgress(lessonId: string) {
 
   if (!user) throw new Error("User not found")
 
-  // 3. Check if progress already exists using the unique compound index
   const existingProgress = await prisma.userProgress.findUnique({
     where: {
       userId_lessonId: {
@@ -60,7 +78,6 @@ export async function toggleLessonProgress(lessonId: string) {
   })
 
   if (existingProgress) {
-    // If it exists, delete it (Unmark as complete)
     await prisma.userProgress.delete({
       where: {
         userId_lessonId: {
@@ -70,7 +87,6 @@ export async function toggleLessonProgress(lessonId: string) {
       }
     })
   } else {
-    // If it doesn't exist, create it (Mark as complete)
     await prisma.userProgress.create({
       data: {
         userId: user.id,
@@ -80,7 +96,6 @@ export async function toggleLessonProgress(lessonId: string) {
     })
   }
 
-  // 4. Refresh the data cache so the UI updates immediately
   revalidatePath('/dashboard')
   revalidatePath(`/lessons/${lessonId}`)
   

@@ -1,61 +1,163 @@
-import { prisma } from "@/lib/prisma";
-import { Plus, BookOpen, DollarSign, Layers } from "lucide-react";
+'use client';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Script from 'next/script';
+import { BookPlus, Image as ImageIcon, Loader2, DollarSign, AlertCircle } from 'lucide-react';
 
-export default async function AdminCourses() {
-  // Fetch existing courses to show in a table below the form
-  const courses = await prisma.course.findMany({
-    orderBy: { createdAt: 'desc' }
+export default function AdminAddCourse() {
+  const [teachers, setTeachers] = useState<any[]>([]); // Initialized as empty array
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    thumbnail: '',
+    price: '',
+    teacherId: ''
   });
 
+  const router = useRouter();
+
+  // Load teachers with error handling
+  useEffect(() => {
+    fetch('/api/teachers')
+      .then(res => res.json())
+      .then(data => {
+        // Ensure data is an array before setting state
+        if (Array.isArray(data)) {
+          setTeachers(data);
+        } else {
+          console.error("API did not return an array:", data);
+          setTeachers([]);
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching teachers:", err);
+        setTeachers([]);
+      });
+  }, []);
+
+  const handleUpload = () => {
+    // @ts-ignore
+    const widget = window.cloudinary.createUploadWidget(
+
+      { cloudName: 'Lamed-English', uploadPreset: 'lamed_preset' },
+      (error: any, result: any) => {
+        if (!error && result && result.event === "success") {
+          setFormData(prev => ({ ...prev, thumbnail: result.info.secure_url }));
+        }
+      }
+    );
+    widget.open();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.thumbnail) return alert("Upload a thumbnail first!");
+    
+    setLoading(true);
+    try {
+      const res = await fetch('/api/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (res.ok) {
+        alert("Course created!");
+        router.push('/courses');
+        router.refresh();
+      } else {
+        const err = await res.json();
+        alert(`Error: ${err.error}`);
+      }
+    } catch (error) {
+      alert("Network error.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="max-w-6xl mx-auto">
-      <header className="flex justify-between items-end mb-12">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900">Manage Courses</h1>
-          <p className="text-slate-500">Add or edit your English learning content.</p>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Course Creation Form (Simple version for now) */}
-        <div className="lg:col-span-1 bg-white p-8 rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 h-fit">
-          <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
-            <Plus size={20} className="text-yellow-500" /> New Course
-          </h2>
-          <form className="space-y-4">
-            <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Course Title</label>
-              <input type="text" className="w-full bg-slate-50 border-none rounded-xl p-4 mt-1 focus:ring-2 focus:ring-yellow-400 outline-none" placeholder="Business English 101" />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price ($)</label>
-              <input type="number" className="w-full bg-slate-50 border-none rounded-xl p-4 mt-1 focus:ring-2 focus:ring-yellow-400 outline-none" placeholder="49.99" />
-            </div>
-            <button className="w-full bg-slate-900 text-yellow-400 py-4 rounded-xl font-bold mt-4 hover:bg-slate-800 transition-all">
-              Create Course
-            </button>
-          </form>
+    <div className="min-h-screen bg-slate-50 py-20 px-6">
+      <Script src="https://upload-widget.cloudinary.com/global/all.js" strategy="beforeInteractive" />
+      
+      <div className="max-w-3xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100">
+        <div className="bg-slate-900 p-12 text-white">
+          <h1 className="text-4xl font-black mb-2 tracking-tighter">New Course</h1>
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Academic Catalog</p>
         </div>
 
-        {/* Courses Table */}
-        <div className="lg:col-span-2 space-y-4">
-          {courses.map((course) => (
-            <div key={course.id} className="bg-white p-6 rounded-2xl flex items-center justify-between border border-slate-100 hover:border-yellow-400 transition-colors shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400">
-                  <BookOpen size={24} />
+        <form onSubmit={handleSubmit} className="p-12 space-y-8">
+          {/* Thumbnail */}
+          <div className="space-y-2">
+            <div onClick={handleUpload} className="border-4 border-dashed rounded-[2.5rem] p-10 text-center cursor-pointer bg-slate-50 hover:border-yellow-400 transition-all">
+              {formData.thumbnail ? (
+                <img src={formData.thumbnail} className="w-48 mx-auto rounded-xl shadow-lg" alt="Preview"/>
+              ) : (
+                <div className="text-slate-400 flex flex-col items-center gap-2">
+                  <ImageIcon size={40} />
+                  <p className="font-bold text-xs uppercase">Upload Banner</p>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900">{course.title}</h3>
-                  <p className="text-xs text-slate-500">${course.price} • {course.createdAt.toLocaleDateString()}</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                 <button className="p-2 text-slate-400 hover:text-slate-900"><Layers size={20} /></button>
-              </div>
+              )}
             </div>
-          ))}
-        </div>
+          </div>
+
+          {/* Form Fields */}
+          <div className="space-y-6">
+            <input 
+              required
+              className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold"
+              placeholder="Course Title"
+              value={formData.title}
+              onChange={e => setFormData({...formData, title: e.target.value})}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <input 
+                required
+                type="number"
+                className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold"
+                placeholder="Price ($)"
+                value={formData.price}
+                onChange={e => setFormData({...formData, price: e.target.value})}
+              />
+
+              <select 
+                required
+                className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold"
+                value={formData.teacherId}
+                onChange={e => setFormData({...formData, teacherId: e.target.value})}
+              >
+                <option value="">-- Assign Teacher --</option>
+                {/* SAFE MAP CHECK */}
+                {Array.isArray(teachers) && teachers.length > 0 ? (
+                  teachers.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))
+                ) : (
+                  <option disabled>No teachers found</option>
+                )}
+              </select>
+            </div>
+
+            <textarea 
+              required
+              rows={4}
+              className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold"
+              placeholder="Description..."
+              value={formData.description}
+              onChange={e => setFormData({...formData, description: e.target.value})}
+            />
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-slate-900 text-white py-6 rounded-2xl font-black hover:bg-yellow-400 hover:text-slate-900 transition-all flex items-center justify-center gap-3"
+          >
+            {loading ? <Loader2 className="animate-spin" /> : "CREATE COURSE"}
+          </button>
+        </form>
       </div>
     </div>
   );

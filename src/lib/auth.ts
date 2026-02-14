@@ -6,7 +6,7 @@ import { NextAuthOptions } from "next-auth";
 import bcrypt from "bcrypt";
 
 export const authOptions: NextAuthOptions = {
-  // Connects NextAuth to your Supabase database via Prisma
+  // Connects NextAuth to your database via Prisma
   adapter: PrismaAdapter(prisma),
   
   providers: [
@@ -24,22 +24,18 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        // Validation: Ensure fields aren't empty
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Please enter both email and password.');
         }
 
-        // Search for user in your Supabase 'User' table
         const user = await prisma.user.findUnique({
           where: { email: credentials.email }
         });
 
-        // Error if user doesn't exist OR if they signed up with Google (no password)
         if (!user || !user.hashedPassword) {
           throw new Error('No account found with this email. Try Google login.');
         }
 
-        // Compare the password typed in with the encrypted one in the DB
         const isPasswordCorrect = await bcrypt.compare(
           credentials.password,
           user.hashedPassword
@@ -49,39 +45,39 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Incorrect password.');
         }
 
-        // Success: Return user object to create a session
         return user;
       }
     })
   ],
 
-  // Custom pages UI
   pages: {
-    signIn: '/login', // Redirects users to our custom login page
+    signIn: '/login',
   },
 
-  // Session configuration
   session: {
-    strategy: "jwt", // Required when using Credentials provider
+    strategy: "jwt", 
   },
 
+  // ⬇️ THIS IS THE IMPORTANT PART WE UPDATED ⬇️
   callbacks: {
-    // Adds the user's ID to the session so we can identify them in the Dashboard
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id = token.sub;
-      }
-      return session;
-    },
-    // Ensures JWT token is created correctly
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
+        // @ts-ignore - Pass the role to the token
+        token.role = user.role; 
       }
       return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        // @ts-ignore - Pass the id to the session
+        session.user.id = token.sub;
+        // @ts-ignore - Pass the role to the session so Middleware can see it
+        session.user.role = token.role; 
+      }
+      return session;
     }
   },
 
-  // Secret key for encrypting the session cookie
   secret: process.env.NEXTAUTH_SECRET,
 };
