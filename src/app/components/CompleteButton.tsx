@@ -1,49 +1,42 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import { CheckCircle, Circle, Loader2 } from 'lucide-react';
-import { toggleProgress } from '@/lib/progress';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toggleLessonProgress } from '@/actions/course'
+import { CheckCircle2, Loader2 } from 'lucide-react'
 
-interface CompleteButtonProps {
-  userId: string;
-  lessonId: string;
-  courseId: string;
-  isCompleted: boolean;
-}
-
-export default function CompleteButton({ userId, lessonId, courseId, isCompleted }: CompleteButtonProps) {
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+export default function CompleteButton({ lessonId, isCompleted }: { lessonId: string, isCompleted: boolean }) {
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
   const handleToggle = async () => {
-    setLoading(true);
-    const result = await toggleProgress(userId, lessonId, courseId);
-    
-    if (result.success) {
-      router.refresh(); // Refresh the page to update the sidebar checkmarks
+    setLoading(true)
+    try {
+      await toggleLessonProgress(lessonId)
+      router.refresh()
+    } finally {
+      setLoading(false)
     }
-    setLoading(false);
-  };
+  }
 
   return (
-    <button
+    <button 
       onClick={handleToggle}
       disabled={loading}
-      className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 ${
+      className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black transition-all active:scale-95 ${
         isCompleted 
-          ? 'bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20' 
-          : 'bg-yellow-400 text-slate-900 hover:bg-yellow-500 shadow-lg shadow-yellow-400/20'
+        ? "bg-green-100 text-green-700 hover:bg-green-200" 
+        : "bg-slate-900 text-yellow-400 hover:bg-slate-800 shadow-lg"
       }`}
     >
       {loading ? (
-        <Loader2 size={20} className="animate-spin" />
-      ) : isCompleted ? (
-        <CheckCircle size={20} />
+        <Loader2 className="animate-spin" size={20} />
       ) : (
-        <Circle size={20} />
+        <>
+          {isCompleted ? "COMPLETED" : "MARK AS COMPLETE"}
+          <CheckCircle2 size={20} fill={isCompleted ? "currentColor" : "none"} />
+        </>
       )}
-      {isCompleted ? 'Completed' : 'Mark as Complete'}
     </button>
-  );
+  )
 }

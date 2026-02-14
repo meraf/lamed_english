@@ -1,3 +1,8 @@
+enum Role {
+  USER
+  ADMIN
+}
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,16 +13,18 @@ datasource db {
 }
 
 model User {
-  id             String         @id @default(cuid())
-  name           String?
-  email          String?        @unique
-  hashedPassword String?
-  emailVerified  DateTime?
-  image          String?
-  accounts       Account[]
-  sessions       Session[]
-  enrolledCourses Course[]
-  progress       UserProgress[] // NEW: Connects user to their progress
+  id              String         @id @default(cuid())
+  name            String?
+  email           String?        @unique
+  hashedPassword  String?
+  emailVerified   DateTime?
+  image           String?
+  role            Role           @default(USER)
+  accounts        Account[]
+  sessions        Session[]
+  // FIXED: Added the relation name to match Course model
+  enrolledCourses Course[]       @relation("UserEnrollments")
+  progress        UserProgress[] 
 }
 
 model Course {
@@ -28,7 +35,8 @@ model Course {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   lessons     Lesson[]
-  users       User[]
+  // FIXED: Relation name matches User model
+  users       User[]   @relation("UserEnrollments")
 }
 
 model Lesson {
@@ -39,7 +47,7 @@ model Lesson {
   order     Int
   courseId  String
   course    Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  progress  UserProgress[] // NEW: Connects lesson to progress records
+  progress  UserProgress[] 
 }
 
 model UserProgress {
@@ -53,8 +61,10 @@ model UserProgress {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, lessonId]) // Ensures a user can't have duplicate progress for one lesson
+  @@unique([userId, lessonId])
 }
+
+// NextAuth models below remain the same...
 
 model Account {
   id                String  @id @default(cuid())
@@ -88,14 +98,5 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
-}
-model Progress {
-  id        String   @id @default(cuid())
-  userId    String
-  lessonId  String
-  completed Boolean  @default(true)
-  updatedAt DateTime @updatedAt
 
-  // This ensures a user can't "complete" the same lesson twice in the DB
-  @@unique([userId, lessonId])
 }
