@@ -48,12 +48,16 @@ export async function registerUser(formData: FormData): Promise<AuthResponse> {
   }
 }
 
-// --- 2. COURSE ENROLLMENT (The Missing Function) ---
+// --- 2. LESSON CREATION ---
 export async function createLesson(formData: FormData) {
   const title = formData.get("title") as string;
   const videoUrl = formData.get("videoUrl") as string;
   const courseId = formData.get("courseId") as string;
   const order = parseInt(formData.get("order") as string || "0");
+
+  if (!title || !videoUrl || !courseId) {
+    throw new Error("Missing lesson data");
+  }
 
   await prisma.lesson.create({
     data: {
@@ -65,9 +69,49 @@ export async function createLesson(formData: FormData) {
   });
 
   revalidatePath(`/courses/${courseId}`);
+  revalidatePath('/admin');
   return { success: true };
 }
-export async function enrollInCourse(courseId: string, formData: FormData) {
+
+// --- 3. COURSE ENROLLMENT ---
+export async function enrollInCourse(courseId: string) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    redirect("/login");
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true }
+    });
+
+    if (!user) throw new Error("User not found");
+
+    await prisma.enrollment.create({
+      data: {
+        userId: user.id,
+        courseId: courseId,
+      }
+    });
+
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+       console.log("User already enrolled.");
+    } else {
+       console.error("Enrollment error:", error);
+       return { error: "Failed to enroll" };
+    }
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath(`/courses/${courseId}`);
+  redirect(`/courses/${courseId}`); 
+}
+
+// --- 4. COURSE UNENROLLMENT (The Missing Function) ---
+export async function unenrollFromCourse(courseId: string) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email) {
@@ -75,21 +119,27 @@ export async function enrollInCourse(courseId: string, formData: FormData) {
   }
 
   try {
-    await prisma.user.update({
+    const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      data: {
-        enrolledCourses: {
-          connect: { id: courseId }
+      select: { id: true }
+    });
+
+    if (!user) throw new Error("User not found");
+
+    // Deleting from the explicit bridge table using the composite ID
+    await prisma.enrollment.delete({
+      where: {
+        userId_courseId: {
+          userId: user.id,
+          courseId: courseId,
         }
       }
     });
-  } catch (error) {
-    console.error("Enrollment error:", error);
-    return { error: "Failed to enroll" };
-  }
 
-  // Refresh data and send them to the course
-  revalidatePath('/dashboard');
-  revalidatePath(`/courses/${courseId}`);
-  redirect(`/courses/${courseId}`); 
+    revalidatePath('/dashboard');
+    return { success: true };
+  } catch (error) {
+    console.error("Unenrollment error:", error);
+    return { error: "Failed to unenroll" };
+  }
 }

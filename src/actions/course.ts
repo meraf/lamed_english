@@ -7,7 +7,6 @@ import { revalidatePath } from "next/cache"
 
 /**
  * Action to enroll a student in a course
- * Updated for Explicit Many-to-Many (Enrollment Model)
  */
 export async function enrollInCourse(courseId: string) {
   const session = await getServerSession(authOptions)
@@ -16,7 +15,6 @@ export async function enrollInCourse(courseId: string) {
     throw new Error("You must be logged in to enroll")
   }
 
-  // 1. First, we need the User's ID (not just their email)
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
     select: { id: true }
@@ -24,7 +22,6 @@ export async function enrollInCourse(courseId: string) {
 
   if (!user) throw new Error("User not found")
 
-  // 2. Check if the user is already enrolled to prevent duplicates
   const existingEnrollment = await prisma.enrollment.findUnique({
     where: {
       userId_courseId: {
@@ -38,8 +35,6 @@ export async function enrollInCourse(courseId: string) {
     return { success: false, message: "Already enrolled" }
   }
 
-  // 3. Create the Enrollment record
-  // This bridges the User and the Course
   await prisma.enrollment.create({
     data: {
       userId: user.id,
@@ -54,7 +49,49 @@ export async function enrollInCourse(courseId: string) {
 }
 
 /**
- * Action to toggle lesson completion (Mark as Done / Undone)
+ * NEW: Action to remove a student from a course
+ * This targets the explicit join table (Enrollment)
+ */
+export async function unenrollFromCourse(courseId: string, userId?: string) {
+  const session = await getServerSession(authOptions)
+  
+  if (!session?.user?.email) throw new Error("Unauthorized")
+
+  // Use provided userId (Admin mode) or find current user's ID (Self-unenroll)
+  let targetUserId = userId
+
+  if (!targetUserId) {
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true }
+    })
+    if (!user) throw new Error("User not found")
+    targetUserId = user.id
+  }
+
+  try {
+    await prisma.enrollment.delete({
+      where: {
+        userId_courseId: {
+          userId: targetUserId,
+          courseId: courseId,
+        },
+      },
+    })
+
+    revalidatePath('/dashboard')
+    revalidatePath('/admin/enrollments')
+    revalidatePath(`/courses/${courseId}`)
+    
+    return { success: true }
+  } catch (error) {
+    console.error("UNENROLL_ERROR:", error)
+    return { success: false, error: "Enrollment not found or already removed." }
+  }
+}
+
+/**
+ * Action to toggle lesson completion
  */
 export async function toggleLessonProgress(lessonId: string) {
   const session = await getServerSession(authOptions)
