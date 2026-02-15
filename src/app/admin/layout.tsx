@@ -3,7 +3,14 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from 'next/link';
-import { LayoutDashboard, BookPlus, Users, LogOut, ShieldAlert } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  BookPlus, 
+  Users, 
+  LogOut, 
+  GraduationCap, // Icon for Teachers
+  Video          // Icon for Lessons
+} from 'lucide-react';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // 1. Get the session
@@ -22,14 +29,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // 4. SECURITY REDIRECT: Kick them out if they aren't an ADMIN
   if (user?.role !== "ADMIN") {
-    // We send them to the home page or a "not authorized" page
     redirect("/");
   }
 
-  // 5. If they ARE an admin, show the dashboard
+  // 5. Define the Sidebar Menu Items
   const menuItems = [
-    { icon: LayoutDashboard, label: 'Overview', href: '/admin' },
+    // We point 'Manage Lessons' to /admin because that is where your form currently lives
+    { icon: Video, label: 'Add New Lesson', href: '/admin' }, 
     { icon: BookPlus, label: 'Manage Courses', href: '/admin/courses' },
+    { icon: GraduationCap, label: 'Teachers', href: '/admin/teachers' },
     { icon: Users, label: 'Students', href: '/admin/students' },
   ];
 
