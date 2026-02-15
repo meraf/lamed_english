@@ -1,8 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
-import { UserPlus, Image as ImageIcon, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
+import { UserPlus, Image as ImageIcon, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function AdminAddTeacher() {
   const [formData, setFormData] = useState({
@@ -13,17 +13,37 @@ export default function AdminAddTeacher() {
     expertise: '',
   });
   const [loading, setLoading] = useState(false);
+  const [scriptLoaded, setScriptLoaded] = useState(false); // Track script status
   const router = useRouter();
 
   // Cloudinary Upload Logic
   const handleUpload = () => {
+    if (!scriptLoaded) {
+      alert("Cloudinary is still loading... please wait a second.");
+      return;
+    }
+
+    // @ts-ignore
+    if (!window.cloudinary) {
+      alert("Cloudinary SDK not found. Check your internet connection.");
+      return;
+    }
+
     // @ts-ignore
     const widget = window.cloudinary.createUploadWidget(
-
-      { cloudName: 'Lamed-English', uploadPreset: 'lamed_preset' },
+      { 
+        // TIP: Double check if this should be 'lamed-english' (lowercase)
+        cloudName: 'Lamed-English', 
+        uploadPreset: 'lamed_preset',
+        // Optional: Helps Vercel by forcing HTTPS
+        secure: true 
+      },
       (error: any, result: any) => {
         if (!error && result && result.event === "success") {
           setFormData(prev => ({ ...prev, image: result.info.secure_url }));
+        }
+        if (error) {
+          console.error("Cloudinary Error:", error);
         }
       }
     );
@@ -32,14 +52,12 @@ export default function AdminAddTeacher() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.image) {
       alert("Please upload a teacher portrait first!");
       return;
     }
 
     setLoading(true);
-
     try {
       const res = await fetch('/api/teachers', {
         method: 'POST',
@@ -50,15 +68,14 @@ export default function AdminAddTeacher() {
       const data = await res.json();
 
       if (res.ok) {
-        alert("Success: Instructor added to database!");
+        alert("Success: Instructor added!");
         router.push('/teachers');
         router.refresh();
       } else {
-        // This will now show you the SPECIFIC error from Prisma
         alert(`Server Error: ${data.error}`);
       }
     } catch (err) {
-      alert("Network Error: Could not connect to the API. Check your terminal.");
+      alert("Network Error: Could not connect to the API.");
     } finally {
       setLoading(false);
     }
@@ -66,7 +83,12 @@ export default function AdminAddTeacher() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-20 px-6">
-      <Script src="https://upload-widget.cloudinary.com/global/all.js" strategy="beforeInteractive" />
+      {/* Changed strategy to afterInteractive for better Vercel compatibility */}
+      <Script 
+        src="https://upload-widget.cloudinary.com/global/all.js" 
+        strategy="afterInteractive"
+        onLoad={() => setScriptLoaded(true)}
+      />
       
       <div className="max-w-3xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100">
         <div className="bg-slate-900 p-12 text-white text-center">
@@ -94,7 +116,7 @@ export default function AdminAddTeacher() {
               ) : (
                 <div className="text-slate-400 flex flex-col items-center gap-2">
                   <ImageIcon size={40} />
-                  <p className="font-bold">Click to Upload via Cloudinary</p>
+                  <p className="font-bold">{scriptLoaded ? "Click to Upload via Cloudinary" : "Loading Cloudinary..."}</p>
                 </div>
               )}
             </div>
