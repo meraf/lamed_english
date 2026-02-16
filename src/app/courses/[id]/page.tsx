@@ -1,156 +1,101 @@
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
-import { PlayCircle, CheckCircle, Lock, ChevronLeft, Menu } from "lucide-react";
+import { ChevronLeft, Play, Lock } from "lucide-react";
+import EnrollButton from "@/app/components/EnrollButton";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth"; // Ensure this path is correct
 
-// Helper function to get clean Embed URL from YouTube/Vimeo
-function getEmbedUrl(url: string) {
-  if (!url) return "";
-  
-  // Handle YouTube
-  if (url.includes("youtube.com") || url.includes("youtu.be")) {
-    let videoId = "";
-    if (url.includes("v=")) {
-      videoId = url.split("v=")[1].split("&")[0];
-    } else if (url.includes("youtu.be/")) {
-      videoId = url.split("youtu.be/")[1];
-    }
-    return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
-  }
-  
-  // Handle Vimeo
-  if (url.includes("vimeo.com")) {
-    const videoId = url.split("vimeo.com/")[1];
-    return `https://player.vimeo.com/video/${videoId}`;
-  }
+export default async function CoursePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const session = await getServerSession(authOptions);
 
-  return url;
-}
-
-interface CoursePageProps {
-  params: { courseId: string };
-  searchParams: { lessonId?: string };
-}
-
-export default async function CourseClassroomPage({ params, searchParams }: CoursePageProps) {
-  // 1. Fetch the Course and ALL its lessons (ordered by your 'order' number)
   const course = await prisma.course.findUnique({
-    where: { id: params.courseId },
-    include: {
-      lessons: {
-        orderBy: { order: 'asc' }
-      }
-    }
+    where: { id },
+    include: { lessons: { orderBy: { order: 'asc' } } }
   });
 
-  if (!course) {
-    return <div className="p-20 text-center font-bold text-slate-400">Course not found.</div>;
-  }
+  if (!course) notFound();
 
-  // 2. Determine which lesson to show
-  // If ?lessonId=... is in the URL, use that. Otherwise, use the very first lesson.
-  const activeLesson = searchParams.lessonId 
-    ? course.lessons.find(l => l.id === searchParams.lessonId) 
-    : course.lessons[0];
+  // 1. Get user and check enrollment status
+  const user = session?.user?.email 
+    ? await prisma.user.findUnique({ where: { email: session.user.email } }) 
+    : null;
 
-  // If no lessons exist yet
-  if (!activeLesson) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
-        <h1 className="text-3xl font-black text-yellow-400 mb-4">{course.title}</h1>
-        <p className="text-slate-400">No lessons have been uploaded to this course yet.</p>
-        <Link href="/courses" className="mt-8 text-sm font-bold underline hover:text-white">Go Back</Link>
-      </div>
-    );
-  }
+  const enrollment = user 
+    ? await prisma.userProgress.findFirst({
+        where: { 
+          userId: user.id, 
+          lesson: { courseId: id } 
+        }
+      })
+    : null;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
-      
-      {/* --- LEFT SIDE: VIDEO PLAYER & CONTENT --- */}
-      <div className="flex-1 flex flex-col">
-        {/* Mobile Header */}
-        <div className="lg:hidden p-4 bg-slate-900 text-white flex items-center justify-between">
-           <Link href="/courses" className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-             <ChevronLeft size={16} /> Courses
-           </Link>
-           <span className="font-bold truncate max-w-[200px]">{course.title}</span>
-        </div>
-
-        {/* Video Player Container */}
-        <div className="bg-black aspect-video w-full relative group">
-           <iframe 
-             src={getEmbedUrl(activeLesson.videoUrl)} 
-             className="w-full h-full absolute top-0 left-0"
-             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-             allowFullScreen
-           />
-        </div>
-
-        {/* Lesson Details */}
-        <div className="p-8 max-w-4xl">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
-              {activeLesson.title}
-            </h1>
-            <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full uppercase tracking-widest">
-              Lesson {activeLesson.order}
-            </span>
-          </div>
-          
-          <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
-            {/* If you add a description field to lessons later, render it here */}
-            <p>Watch the video above carefully. Make sure to take notes on the new vocabulary and grammar points introduced in this session.</p>
-          </div>
-
-          {/* Navigation Buttons (Next/Prev) */}
-          <div className="mt-12 flex items-center justify-between border-t border-slate-200 pt-8">
-             <Link href="/courses" className="text-slate-400 hover:text-slate-900 font-bold text-sm flex items-center gap-2">
-                <ChevronLeft size={16}/> Back to Course List
-             </Link>
-             {/* Logic for Next Lesson Button could go here */}
+    <div className="min-h-screen bg-white">
+      {/* Hero Header */}
+      <div className="bg-slate-900 pt-20 pb-32 px-6">
+        <div className="max-w-5xl mx-auto">
+          <Link href="/dashboard" className="text-slate-400 hover:text-white flex items-center gap-2 mb-8 transition-colors font-bold text-sm">
+            <ChevronLeft size={16} /> BACK TO DASHBOARD
+          </Link>
+          <div className="flex flex-col md:flex-row gap-12 items-center">
+            <div className="flex-1">
+              <span className="bg-yellow-400 text-slate-900 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest mb-4 inline-block">
+                Course
+              </span>
+              <h1 className="text-5xl md:text-6xl font-black text-white mb-6 leading-tight">{course.title}</h1>
+              <p className="text-slate-400 text-lg max-w-xl mb-8 leading-relaxed">{course.description}</p>
+              
+              {!enrollment ? (
+                <EnrollButton courseId={id} />
+              ) : (
+                <Link href={`/courses/${id}/lessons/${course.lessons[0]?.id}`} className="bg-white text-slate-900 px-8 py-4 rounded-2xl font-black flex items-center gap-2 w-fit hover:bg-yellow-400 transition-all shadow-xl">
+                  CONTINUE LEARNING <Play size={18} fill="currentColor"/>
+                </Link>
+              )}
+            </div>
+            <div className="w-full md:w-1/3 aspect-square bg-slate-800 rounded-[3rem] border border-slate-700 flex items-center justify-center shadow-2xl relative overflow-hidden group">
+               <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-transparent opacity-50" />
+               <Play size={80} className="text-white/20 group-hover:text-yellow-400 transition-colors relative z-10" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* --- RIGHT SIDE: LESSON PLAYLIST SIDEBAR --- */}
-      <div className="w-full lg:w-96 bg-white border-l border-slate-200 flex flex-col h-auto lg:h-screen sticky top-0 overflow-y-auto">
-        <div className="p-6 border-b border-slate-100 bg-slate-50">
-          <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">Course Content</h2>
-          <h3 className="font-black text-xl text-slate-900 leading-tight">{course.title}</h3>
-          <p className="text-xs font-bold text-slate-500 mt-2">{course.lessons.length} Lessons</p>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {course.lessons.map((lesson, index) => {
-            const isActive = lesson.id === activeLesson.id;
-            return (
-              <Link 
-                key={lesson.id} 
-                href={`/courses/${course.id}?lessonId=${lesson.id}`}
-                className={`group flex items-start gap-4 p-4 border-b border-slate-50 transition-all cursor-pointer ${
-                  isActive 
-                    ? "bg-slate-900 border-l-4 border-l-yellow-400" 
-                    : "hover:bg-slate-50 border-l-4 border-l-transparent"
-                }`}
-              >
-                <div className={`mt-1 ${isActive ? "text-yellow-400" : "text-slate-300 group-hover:text-slate-400"}`}>
-                  {isActive ? <PlayCircle size={20} fill="currentColor" className="text-slate-900" /> : <PlayCircle size={20} />}
+      {/* Curriculum Section */}
+      <div className="max-w-5xl mx-auto px-6 -mt-16">
+        <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+          <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <h2 className="font-black text-slate-900 text-xl tracking-tight">Course Content</h2>
+            <span className="text-slate-400 font-bold text-sm">{course.lessons.length} Lessons</span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {course.lessons.map((lesson, idx) => (
+              <div key={lesson.id} className="flex items-center justify-between p-6 hover:bg-slate-50 transition-all group">
+                <div className="flex items-center gap-6">
+                  <div className="text-slate-300 font-black text-2xl group-hover:text-slate-900 transition-colors w-8">
+                    {String(idx + 1).padStart(2, '0')}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-lg">{lesson.title}</h3>
+                    <p className="text-slate-400 text-sm font-medium">Video Lesson</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className={`text-sm font-bold leading-snug ${isActive ? "text-white" : "text-slate-700"}`}>
-                    {index + 1}. {lesson.title}
-                  </h4>
-                  <span className={`text-[10px] uppercase font-bold tracking-wider ${isActive ? "text-slate-500" : "text-slate-400"}`}>
-                    12 Mins
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
+                {enrollment ? (
+                  <Link href={`/courses/${id}/lessons/${lesson.id}`} className="text-slate-900 hover:text-yellow-600 font-black text-sm flex items-center gap-1">
+                    START <Play size={14} fill="currentColor" />
+                  </Link>
+                ) : (
+                  <Lock size={18} className="text-slate-200" />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-
     </div>
   );
 }
