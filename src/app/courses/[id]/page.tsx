@@ -32,6 +32,7 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
         }
       })
     : null;
+// ... (keep the top part of your code the same)
 
   return (
     <div className="min-h-screen bg-white">
@@ -52,7 +53,8 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
               {!enrollment ? (
                 <EnrollButton courseId={id} />
               ) : (
-                <Link href={`/courses/${id}/lessons/${course.lessons[0]?.id}`} className="bg-white text-slate-900 px-8 py-4 rounded-2xl font-black flex items-center gap-2 w-fit hover:bg-yellow-400 transition-all shadow-xl">
+                /* ✅ FIXED LINK 1: Point to the classroom page */
+                <Link href={`/courses/${id}`} className="bg-white text-slate-900 px-8 py-4 rounded-2xl font-black flex items-center gap-2 w-fit hover:bg-yellow-400 transition-all shadow-xl">
                   CONTINUE LEARNING <Play size={18} fill="currentColor"/>
                 </Link>
               )}
@@ -85,7 +87,8 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
                   </div>
                 </div>
                 {enrollment ? (
-                  <Link href={`/courses/${id}/lessons/${lesson.id}`} className="text-slate-900 hover:text-yellow-600 font-black text-sm flex items-center gap-1">
+                  /* ✅ FIXED LINK 2: Use query parameters for lesson selection */
+                  <Link href={`/courses/${id}?lessonId=${lesson.id}`} className="text-slate-900 hover:text-yellow-600 font-black text-sm flex items-center gap-1">
                     START <Play size={14} fill="currentColor" />
                   </Link>
                 ) : (

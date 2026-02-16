@@ -58,8 +58,8 @@ export default async function LessonPage({ params }: PageProps) {
       {/* Sidebar Curriculum */}
       <aside className="w-full lg:w-80 bg-slate-50 border-r border-slate-100 overflow-y-auto h-screen sticky top-0">
         <div className="p-6 border-b border-slate-200 bg-white">
-          <Link href={`/courses/${courseUrlId}`} className="text-xs font-bold text-slate-400 hover:text-slate-900 flex items-center gap-1 mb-4">
-            <ChevronLeft size={14}/> BACK TO COURSE
+          <Link href={`/dashboard`} className="text-xs font-bold text-slate-400 hover:text-slate-900 flex items-center gap-1 mb-4">
+            <ChevronLeft size={14}/> BACK TO COURSE LIST
           </Link>
           <h2 className="font-black text-slate-900 leading-tight">{lesson.course.title}</h2>
         </div>
@@ -95,19 +95,22 @@ export default async function LessonPage({ params }: PageProps) {
       <main className="flex-grow">
         <div className="max-w-5xl mx-auto p-6 md:p-12">
           <div className="aspect-video bg-slate-900 rounded-[2.5rem] mb-8 overflow-hidden shadow-2xl flex items-center justify-center relative">
-             {lesson.videoUrl ? (
-               <iframe 
-                 className="w-full h-full" 
-                 src={lesson.videoUrl} 
-                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                 allowFullScreen 
-               />
-             ) : (
-               <div className="text-center text-slate-500">
-                 <PlayCircle size={64} className="mb-4 mx-auto opacity-20" />
-                 <p className="font-bold text-xs uppercase tracking-widest">Video coming soon</p>
-               </div>
-             )}
+{lesson.videoUrl ? (
+  <iframe 
+    className="w-full h-full" 
+    /* ✅ This logic converts standard links to embed links on the fly */
+    src={lesson.videoUrl.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")} 
+    title="YouTube video player"
+    frameBorder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    allowFullScreen 
+  />
+) : (
+  <div className="text-center text-slate-500">
+    <PlayCircle size={64} className="mb-4 mx-auto opacity-20" />
+    <p className="font-bold text-xs uppercase tracking-widest">Video coming soon</p>
+  </div>
+)}
           </div>
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-12">
