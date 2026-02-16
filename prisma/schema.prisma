@@ -45,7 +45,8 @@ model Course {
   title       String
   description String
   price       Float
-  thumbnail   String?      
+  thumbnail   String?  // Add this if missing
+  image       String?  // Add this if missing    
   teacherId   String
   teacher     Teacher      @relation(fields: [teacherId], references: [id])
   createdAt   DateTime     @default(now())

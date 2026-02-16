@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, CheckCircle, PlayCircle, GraduationCap } from "lucide-react";
+import { BookOpen, CheckCircle, PlayCircle, GraduationCap, ArrowRight } from "lucide-react";
 import { UnenrollButton } from "@/app/components/UnenrollButton";
 
 export default async function DashboardPage() {
@@ -46,6 +46,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
+      {/* HEADER SECTION */}
       <div className="bg-slate-900 pt-32 pb-20 px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-end gap-6">
           <div>
@@ -69,6 +70,8 @@ export default async function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-8 -mt-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+          
+          {/* LEFT COLUMN: ENROLLED COURSES */}
           <div className="lg:col-span-2 space-y-6">
             <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
               <PlayCircle size={18} /> Continue Learning
@@ -82,16 +85,22 @@ export default async function DashboardPage() {
                 return (
                   <div key={course.id} className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
                     <div className="flex flex-col md:flex-row gap-8 items-center">
+                      {/* Thumbnail */}
                       <div className="w-full md:w-48 h-32 bg-slate-100 rounded-3xl overflow-hidden shrink-0 relative">
-                        {course.thumbnail ? (
-                          <img src={course.thumbnail} className="w-full h-full object-cover" alt="" />
+                        {/* @ts-ignore - course may have thumbnail or image depending on your schema */}
+                        {(course.thumbnail || course.image) ? (
+                          <img src={course.thumbnail || course.image} className="w-full h-full object-cover" alt="" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center"><BookOpen className="text-slate-300" /></div>
                         )}
                       </div>
 
+                      {/* Info & Progress */}
                       <div className="flex-grow space-y-4 w-full">
-                        <h3 className="text-2xl font-black text-slate-900 tracking-tight">{course.title}</h3>
+                        <div className="flex justify-between items-start">
+                          <h3 className="text-2xl font-black text-slate-900 tracking-tight">{course.title}</h3>
+                          <UnenrollButton courseId={course.id} />
+                        </div>
                         
                         <div className="space-y-2">
                           <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -103,16 +112,15 @@ export default async function DashboardPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3">
-                            <Link 
-                              href={`/courses/${course.id}/learn`}
-                              className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 hover:text-slate-900 transition-all shadow-lg"
-                            >
-                              Go to Class
-                            </Link>
-                            <UnenrollButton courseId={course.id} />
-                          </div>
+                        <div className="flex items-center justify-between gap-4 pt-2">
+                          {/* THE CORRECT LINK BUTTON */}
+                          <Link 
+                            href={`/learn/${course.id}`}
+                            className="flex items-center justify-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-2xl font-black hover:bg-yellow-400 hover:text-slate-900 transition-all active:scale-95 text-sm uppercase tracking-widest"
+                          >
+                            Go to Class <ArrowRight size={16} />
+                          </Link>
+
                           <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
                             {course._count.lessons} Lessons
                           </span>
@@ -133,6 +141,7 @@ export default async function DashboardPage() {
             )}
           </div>
 
+          {/* RIGHT COLUMN: GOALS & STATS */}
           <div className="space-y-8">
             <div className="bg-yellow-400 rounded-[3rem] p-10 shadow-xl shadow-yellow-400/20">
               <h3 className="text-2xl font-black text-slate-900 mb-2">Weekly Goal</h3>
@@ -161,6 +170,7 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
+
         </div>
       </main>
     </div>

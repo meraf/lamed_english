@@ -1,103 +1,126 @@
-export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { Clock, Star, ArrowRight, Zap, User } from "lucide-react";
+import { PlayCircle, ChevronLeft, BookOpen, Video } from "lucide-react";
 
-export default async function PublicCoursesPage({ searchParams }: { searchParams: Promise<{ teacherId?: string }> }) {
-  const { teacherId } = await searchParams;
+// In Next.js 15/16, params and searchParams must be treated as Promises
+interface CoursePageProps {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ lessonId?: string }>;
+}
 
-  const courses = await prisma.course.findMany({
-    where: teacherId ? { teacherId } : {},
-    include: {
-      teacher: true,
-      _count: { select: { lessons: true } }
+function getEmbedUrl(url: string) {
+  if (!url) return "";
+  if (url.includes("youtube.com") || url.includes("youtu.be")) {
+    const videoId = url.includes("v=") 
+      ? url.split("v=")[1].split("&")[0] 
+      : url.split("youtu.be/")[1];
+    return `https://www.youtube.com/embed/${videoId}?rel=0`;
+  }
+  return url;
+}
+
+export default async function CourseClassroomPage({ params, searchParams }: CoursePageProps) {
+  // 1. AWAIT the params to extract the ID
+  const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
+  
+  // 2. Use 'resolvedParams.id' (matching your folder name [id])
+  const course = await prisma.course.findUnique({
+    where: { 
+      id: resolvedParams.id 
     },
-    orderBy: { createdAt: 'desc' }
+    include: {
+      lessons: {
+        orderBy: { order: "asc" },
+      },
+    },
   });
 
+  if (!course) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <h2 className="text-2xl font-black text-slate-900">Course not found</h2>
+          <Link href="/dashboard" className="text-blue-600 font-bold hover:underline">Return to Dashboard</Link>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Select the lesson to display
+  const activeLesson = resolvedSearchParams.lessonId 
+    ? course.lessons.find((l) => l.id === resolvedSearchParams.lessonId) 
+    : course.lessons[0];
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Hero Section */}
-      <section className="bg-slate-900 py-24 px-8 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto relative z-10">
-          <span className="bg-yellow-400 text-slate-900 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-6 inline-block">
-            {teacherId ? "Teacher's Catalog" : "Elevate Your English"}
-          </span>
-          <h1 className="text-5xl md:text-7xl font-black text-white mb-6 tracking-tighter">
-            {teacherId ? "Masterclass Sessions" : "Master the Language of Global Opportunity."}
-          </h1>
-        </div>
-        {/* Subtle background decoration */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-yellow-400/10 rounded-full blur-[120px] -mr-48 -mt-48" />
-      </section>
-
-      <main className="max-w-7xl mx-auto px-8 -mt-16 pb-32">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {courses.map((course) => (
-            <div key={course.id} className="group bg-white rounded-[2.5rem] border border-slate-100 shadow-xl transition-all duration-500 flex flex-col overflow-hidden hover:-translate-y-2">
-              {/* Course Thumbnail */}
-              <div className="h-48 bg-slate-900 relative overflow-hidden">
-                 {course.thumbnail ? (
-                   <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-500" />
-                 ) : (
-                   <div className="w-full h-full flex items-center justify-center">
-                     <Zap size={60} className="text-yellow-400 opacity-20" />
-                   </div>
-                 )}
-              </div>
-
-              {/* Course Content */}
-              <div className="p-8 flex-grow flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    {/* FIXED: Added optional chaining and fallback for teacher image */}
-                    <img 
-                        src={course.teacher?.image || `https://ui-avatars.com/api/?name=${course.teacher?.name || 'Teacher'}`} 
-                        className="w-6 h-6 rounded-full border border-slate-200 object-cover" 
-                        alt="Instructor"
-                    />
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        {course.teacher?.name || "Expert Instructor"}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-black uppercase text-slate-400">{course._count.lessons} Lessons</span>
-                </div>
-
-                <h3 className="text-2xl font-black text-slate-900 mb-3 group-hover:text-yellow-600 transition-colors">
-                  {course.title}
-                </h3>
-                <p className="text-slate-500 text-sm leading-relaxed mb-8 line-clamp-2">
-                  {course.description}
-                </p>
-
-                {/* Footer / Price & Action */}
-                <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
-                  <div>
-                    <span className="block text-[10px] font-black text-slate-300 uppercase tracking-widest">Investment</span>
-                    <div className="text-2xl font-black text-slate-900">${course.price}</div>
-                  </div>
-                  <Link 
-                    href={`/courses/${course.id}`}
-                    className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-yellow-400 hover:text-slate-900 transition-all shadow-lg active:scale-95"
-                  >
-                    START <ArrowRight size={18} />
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
+    <div className="min-h-screen bg-white flex flex-col lg:flex-row">
+      {/* --- MAIN CONTENT --- */}
+      <div className="flex-1 flex flex-col">
+        <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+          <Link href="/dashboard" className="flex items-center gap-2 text-xs font-black uppercase text-slate-400 hover:text-white transition-all">
+            <ChevronLeft size={16} /> Dashboard
+          </Link>
+          <span className="text-xs font-bold text-slate-400 truncate max-w-[200px]">{course.title}</span>
         </div>
 
-        {/* Empty State */}
-        {courses.length === 0 && (
-          <div className="text-center py-40">
-            <div className="bg-slate-50 inline-block p-10 rounded-[3rem] border-2 border-dashed border-slate-200">
-               <User size={48} className="mx-auto text-slate-200 mb-4" />
-               <h3 className="text-xl font-black text-slate-400">No courses found in this category.</h3>
+        {activeLesson ? (
+          <>
+            <div className="bg-black aspect-video w-full">
+              <iframe 
+                src={getEmbedUrl(activeLesson.videoUrl)} 
+                className="w-full h-full" 
+                allowFullScreen 
+              />
             </div>
+            <div className="p-8 max-w-4xl">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-4">{activeLesson.title}</h1>
+              <p className="text-slate-500 font-medium leading-relaxed">
+                Welcome to this session. Focus on the core concepts and take notes.
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+            <Video size={48} className="mb-4 opacity-20" />
+            <p className="font-bold">No lessons uploaded yet.</p>
           </div>
         )}
-      </main>
+      </div>
+
+      {/* --- SIDEBAR --- */}
+      <div className="w-full lg:w-96 border-l border-slate-200 h-screen overflow-y-auto sticky top-0 bg-slate-50">
+        <div className="p-6 border-b border-slate-200 bg-white">
+          <div className="flex items-center gap-2 mb-2">
+            <BookOpen size={16} className="text-blue-600" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Course Lessons</span>
+          </div>
+          <h2 className="font-black text-slate-900 text-lg leading-tight">{course.title}</h2>
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {course.lessons.map((lesson, index) => {
+            const isActive = lesson.id === activeLesson?.id;
+            return (
+              <Link 
+                key={lesson.id}
+                href={`/courses/${resolvedParams.id}?lessonId=${lesson.id}`}
+                className={`flex items-start gap-4 p-5 transition-all ${
+                  isActive ? "bg-white border-l-4 border-l-blue-600 shadow-sm" : "hover:bg-slate-100 border-l-4 border-l-transparent"
+                }`}
+              >
+                <div className={`mt-1 ${isActive ? "text-blue-600" : "text-slate-300"}`}>
+                  <PlayCircle size={20} fill={isActive ? "currentColor" : "none"} />
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold leading-tight ${isActive ? "text-slate-900" : "text-slate-500"}`}>
+                    {index + 1}. {lesson.title}
+                  </h4>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
