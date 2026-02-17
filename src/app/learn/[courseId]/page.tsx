@@ -57,14 +57,22 @@ export default async function LearnPage({ params, searchParams }: any) {
         </div>
 
         {/* Player Container */}
-        <div className="w-full aspect-video bg-black shadow-2xl">
-          <iframe 
-            src={getEmbedUrl(activeLesson.videoUrl)} 
-            className="w-full h-full" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen 
-          />
-        </div>
+        
+        <div className="w-full aspect-video bg-black shadow-2xl overflow-hidden rounded-xl">
+  {activeLesson.videoUrl ? (
+    <iframe 
+      src={getEmbedUrl(activeLesson.videoUrl)} 
+      className="w-full h-full" 
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowFullScreen 
+    />
+  ) : (
+    <div className="flex items-center justify-center h-full text-slate-500 font-bold">
+      No video available for this lesson
+    </div>
+  )}
+</div>
+
 
         {/* Lesson Description Area */}
         <div className="p-8 md:p-12 max-w-4xl">
