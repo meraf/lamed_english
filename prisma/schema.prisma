@@ -14,19 +14,24 @@ datasource db {
 }
 
 model User {
-  id              String         @id @default(cuid())
-  name            String?
-  email           String?        @unique
-  hashedPassword  String?
-  emailVerified   DateTime?
-  image           String?
-  role            Role           @default(USER)
-  accounts        Account[]
-  sessions        Session[]
-  enrolledCourses Enrollment[]
-  progress        UserProgress[]
-  sentMessages     Message[]     @relation("SentMessages")
-  receivedMessages Message[]     @relation("ReceivedMessages")
+  id                String             @id @default(cuid())
+  name              String?
+  email             String?            @unique
+  hashedPassword    String?
+  emailVerified     DateTime?
+  image             String?
+  role              Role               @default(USER)
+  accounts          Account[]
+  sessions          Session[]
+  enrolledCourses   Enrollment[]
+  progress          UserProgress[]
+  sentMessages      Message[]          @relation("SentMessages")
+  receivedMessages  Message[]          @relation("ReceivedMessages")
+  
+  // NEW RELATIONS ADDED TO MATCH YOUR APP LOGIC
+  examResults       ExamResult[]
+  submissions       Submission[]
+  announcementViews AnnouncementView[]
 }
 
 model Teacher {
@@ -41,18 +46,19 @@ model Teacher {
 }
 
 model Course {
-  id          String       @id @default(cuid())
-  title       String
-  description String
-  price       Float
-  thumbnail   String?  // Add this if missing
-  image       String?  // Add this if missing    
-  teacherId   String
-  teacher     Teacher      @relation(fields: [teacherId], references: [id])
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  lessons     Lesson[]
-  users       Enrollment[]
+  id            String         @id @default(cuid())
+  title         String
+  description   String
+  price         Float
+  thumbnail     String?
+  image         String?    
+  teacherId     String
+  teacher       Teacher        @relation(fields: [teacherId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  lessons       Lesson[]
+  users         Enrollment[]
+  announcements Announcement[]
 }
 
 model Enrollment {
@@ -68,14 +74,16 @@ model Enrollment {
 }
 
 model Lesson {
-  id       String  @id @default(cuid())
-  title    String
-  videoUrl String?
-  content  String?
-  order    Int
-  courseId String
-  course   Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  progress UserProgress[]
+  id          String         @id @default(cuid())
+  title       String
+  videoUrl    String?
+  content     String?
+  order       Int
+  courseId    String
+  course      Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress    UserProgress[]
+  exams       Exam[]
+  assignments Assignment[]
 }
 
 model UserProgress {
@@ -127,6 +135,68 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Exam {
+  id        String       @id @default(cuid())
+  title     String
+  lessonId  String
+  lesson    Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  results   ExamResult[]
+  createdAt DateTime     @default(now())
+}
+
+model ExamResult {
+  id        String   @id @default(cuid())
+  userId    String
+  examId    String
+  score     Float
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+}
+
+model Assignment {
+  id          String       @id @default(cuid())
+  title       String
+  lessonId    String
+  lesson      Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+  createdAt   DateTime     @default(now())
+}
+
+model Submission {
+  id           String     @id @default(cuid())
+  userId       String
+  assignmentId String
+  content      String
+  createdAt    DateTime   @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+}
+
+model Announcement {
+  id        String             @id @default(cuid())
+  title     String
+  content   String
+  courseId  String
+  createdAt DateTime           @default(now())
+  course    Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  viewers   AnnouncementView[]
+}
+
+model AnnouncementView {
+  id             String       @id @default(cuid())
+  userId         String
+  announcementId String
+  createdAt      DateTime     @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, announcementId])
 }
 
 model VerificationToken {
