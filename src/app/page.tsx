@@ -1,6 +1,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { getServerSession } from "next-auth"; 
+import { authOptions } from "@/lib/auth";      
 import { Course } from '@prisma/client';
 import { 
   BookOpen, 
@@ -8,28 +10,67 @@ import {
   Award, 
   Globe, 
   ChevronRight, 
-  Star,
-  CheckCircle2
+  Star
 } from 'lucide-react';
 
 export default async function Home() {
-  // Fetch real courses from your Supabase database via Prisma
+  const session = await getServerSession(authOptions);
+  const mainCtaLink = session ? "/dashboard" : "/courses";
+
+  // 1. Fetch real courses
   const courses: Course[] = await prisma.course.findMany({
-    orderBy: { createdAt: 'desc' }
-  });
+    orderBy: { id: 'desc' }
+  }).catch(() => []);
+
+  // 2. Fetch up to 4 recent students for small social proof circles
+  let recentUsers = await prisma.user.findMany({
+    where: { 
+        image: { not: null },
+        role: 'STUDENT' as any 
+    },
+    take: 4,
+    orderBy: { id: 'desc' }, 
+    select: { id: true, image: true }
+  }).catch(() => []);
+
+  // Fallback if no specific 'STUDENT' role users found
+  if (recentUsers.length === 0) {
+    recentUsers = await prisma.user.findMany({
+      where: { image: { not: null } },
+      take: 4,
+      orderBy: { id: 'desc' },
+      select: { id: true, image: true }
+    }).catch(() => []);
+  }
+
+  // 3. Fetch Teacher Pool for the BIG HERO IMAGE (Random Rotation)
+  // Removed 'rating' from select and orderBy to fix your Prisma error
+  const teacherPool = await prisma.user.findMany({
+    where: { 
+        role: 'TEACHER' as any, 
+        image: { not: null } 
+    },
+    orderBy: { id: 'desc' },
+    take: 10,
+    select: { image: true, name: true }
+  }).catch(() => []);
+
+  // RANDOM LOGIC: Select one teacher from the pool every reload
+  const featuredTeacher = teacherPool.length > 0 
+    ? teacherPool[Math.floor(Math.random() * teacherPool.length)] 
+    : null;
 
   return (
     <div className="min-h-screen bg-white font-sans text-slate-800">
       
       {/* 1. HERO SECTION */}
       <section className="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white overflow-hidden">
-        {/* Animated Background Blobs */}
+        {/* Decorative Blobs */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse"></div>
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse delay-1000"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 grid lg:grid-cols-2 gap-12 items-center relative z-10">
           
-          {/* Hero Content */}
           <div className="space-y-8">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 text-sm font-bold tracking-wide">
               <Star size={14} fill="currentColor" /> 
@@ -51,37 +92,77 @@ export default async function Home() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/courses" className="bg-yellow-400 text-slate-900 px-8 py-4 rounded-xl font-bold text-lg hover:bg-yellow-300 transition-all shadow-lg hover:shadow-yellow-400/40 flex items-center justify-center gap-2">
-                Start Learning <ChevronRight size={20} />
+              <Link 
+                href={mainCtaLink} 
+                className="bg-yellow-400 text-slate-900 px-8 py-4 rounded-xl font-bold text-lg hover:bg-yellow-300 transition-all shadow-lg hover:shadow-yellow-400/40 flex items-center justify-center gap-2"
+              >
+                {session ? "Continue Learning" : "Start Learning"} <ChevronRight size={20} />
               </Link>
-              <button className="border-2 border-slate-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-slate-800 transition-all">
-                Our Teachers
-              </button>
+              
+              <Link href="/courses">
+                <button className="w-full sm:w-auto border-2 border-slate-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-slate-800 transition-all">
+                  Our Teachers
+                </button>
+              </Link>
             </div>
             
-            {/* Social Proof */}
+            {/* Social Proof (Small Student Circles) */}
             <div className="pt-6 flex items-center gap-4 text-sm text-slate-400">
               <div className="flex -space-x-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-10 h-10 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center overflow-hidden">
-                     <div className="bg-slate-700 w-full h-full flex items-center justify-center text-[10px]">User</div>
-                  </div>
-                ))}
+                {recentUsers && recentUsers.length > 0 ? (
+                  recentUsers.map((user) => (
+                    <div key={user.id} className="w-10 h-10 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center overflow-hidden">
+                      <img src={user.image!} alt="Student" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                  ))
+                ) : (
+                   [1, 2, 3].map((i) => (
+                    <div key={i} className="w-10 h-10 rounded-full border-2 border-slate-900 bg-slate-700 flex items-center justify-center overflow-hidden">
+                      <Users size={16} className="text-slate-400" />
+                    </div>
+                   ))
+                )}
               </div>
               <p>Trusted by <span className="text-white font-semibold">1,200+ active students</span></p>
             </div>
           </div>
 
-          {/* Hero Graphic */}
-          <div className="relative flex items-center justify-center">
-            <div className="relative w-full aspect-square max-w-lg bg-blue-800/20 rounded-[3rem] border border-white/10 backdrop-blur-md p-8 shadow-2xl flex items-center justify-center group overflow-hidden">
-               <div className="absolute -top-6 -left-6 bg-white p-4 rounded-xl shadow-xl z-20">
-                  <span className="text-slate-900 font-bold flex items-center gap-2">🇬🇧 Native Tutors</span>
+          {/* HERO GRAPHIC: Dynamic Teacher Rotation */}
+          <div className="relative flex items-center justify-center py-10">
+            <div className="relative w-full aspect-square max-w-lg bg-blue-800/20 rounded-[3rem] border border-white/10 backdrop-blur-md shadow-2xl flex items-center justify-center group">
+               
+               {/* Badge Top Left */}
+               <div className="absolute -top-3 -left-3 md:-top-5 md:-left-5 bg-white p-3 md:p-4 rounded-xl shadow-2xl z-20">
+                  <span className="text-slate-900 font-bold text-xs md:text-base flex items-center gap-2">
+                    🇬🇧 {featuredTeacher?.name || "Expert Tutors"}
+                  </span>
                </div>
-               <div className="absolute -bottom-6 -right-6 bg-yellow-400 p-4 rounded-xl shadow-xl z-20">
-                  <span className="text-slate-900 font-bold flex items-center gap-2 animate-pulse">⭐ 4.9/5 Average Rating</span>
+
+               {/* Badge Bottom Right */}
+               <div className="absolute -bottom-3 -right-3 md:-bottom-5 md:-right-5 bg-yellow-400 p-3 md:p-4 rounded-xl shadow-2xl z-20">
+                  <span className="text-slate-900 font-bold text-xs md:text-base flex items-center gap-2">
+                    ⭐ 4.9/5 Rating
+                  </span>
                </div>
-               <Users size={120} className="text-white/20 group-hover:scale-110 transition-transform duration-700" />
+
+               {/* Teacher Image */}
+               <div className="w-full h-full overflow-hidden rounded-[3rem] flex items-center justify-center bg-slate-800/50">
+                {featuredTeacher?.image ? (
+                  <img 
+                    src={featuredTeacher.image} 
+                    alt={featuredTeacher.name || "Teacher"} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-4 p-8 text-center">
+                    <Users size={80} className="text-white/10" />
+                    <p className="text-xs text-white/30 font-medium">
+                        Assign 'TEACHER' role & an image to a user in Prisma Studio to see them here!
+                    </p>
+                  </div>
+                )}
+               </div>
             </div>
           </div>
         </div>
@@ -124,21 +205,16 @@ export default async function Home() {
             {courses.length > 0 ? (
               courses.map((course) => (
                 <div key={course.id} className="group bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 relative overflow-hidden flex flex-col h-full">
-                  {/* Decorative element */}
                   <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/10 rounded-bl-[100%] -mr-10 -mt-10 transition-transform group-hover:scale-150 duration-700"></div>
-                  
                   <div className="mb-8 p-4 bg-slate-50 w-fit rounded-2xl group-hover:bg-yellow-400 transition-colors duration-500 text-slate-900 shadow-sm">
                     <BookOpen size={24} />
                   </div>
-                  
                   <h3 className="text-2xl font-bold text-slate-900 mb-3 leading-tight group-hover:text-blue-600 transition-colors">
                     {course.title}
                   </h3>
-                  
                   <p className="text-slate-500 mb-8 line-clamp-3 leading-relaxed flex-grow">
                     {course.description}
                   </p>
-                  
                   <div className="flex justify-between items-center pt-6 border-t border-slate-50">
                     <div>
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Tuition</span>
@@ -160,23 +236,6 @@ export default async function Home() {
           </div>
         </div>
       </section>
-
-      {/* 4. CALL TO ACTION */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-        <div className="bg-slate-900 rounded-[3rem] p-12 lg:p-20 text-center relative overflow-hidden">
-          <div className="absolute inset-0 bg-yellow-400/5 mix-blend-overlay"></div>
-          <h2 className="text-3xl lg:text-5xl font-black text-white mb-8 relative z-10">
-            Ready to Speak Fluent English?
-          </h2>
-          <p className="text-slate-400 text-lg mb-12 max-w-2xl mx-auto relative z-10">
-            Join thousands of students who have already transformed their careers and personal lives with Lamed English.
-          </p>
-          <button className="bg-white text-slate-900 px-10 py-5 rounded-2xl font-black text-xl hover:bg-yellow-400 transition-all relative z-10 active:scale-95 shadow-2xl">
-            Get Started Today
-          </button>
-        </div>
-      </section>
-
     </div>
   );
 }

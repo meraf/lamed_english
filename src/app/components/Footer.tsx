@@ -80,7 +80,7 @@ const Footer = () => {
         <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs">
           <p>© {currentYear} Lamed English. All rights reserved.</p>
           <div className="flex gap-8">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Systems Operational</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Powerd By Mafi Technologies.</span>
             <span className="cursor-pointer hover:text-white transition-colors">English (US)</span>
           </div>
         </div>
