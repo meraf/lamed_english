@@ -6,11 +6,26 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
-        // '/**' allows any image path from your Cloudinary account
         pathname: '/**', 
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com', // Google Profile Images
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com', // GitHub Profile Images
+        pathname: '/**',
       },
     ],
   },
+  /* You can add other config options here like experimental turbopack features */
 };
 
 export default nextConfig;

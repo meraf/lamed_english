@@ -1,38 +1,51 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Play, Lock } from "lucide-react";
 import EnrollButton from "@/app/components/EnrollButton";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth"; // Ensure this path is correct
+import { authOptions } from "@/lib/auth";
 
 export default async function CoursePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
 
+  // 1. Fetch course and lessons early
   const course = await prisma.course.findUnique({
     where: { id },
-    include: { lessons: { orderBy: { order: 'asc' } } }
+    include: { 
+      lessons: { orderBy: { order: 'asc' } },
+      teacher: true 
+    }
   });
 
   if (!course) notFound();
 
-  // 1. Get user and check enrollment status
-  const user = session?.user?.email 
-    ? await prisma.user.findUnique({ where: { email: session.user.email } }) 
-    : null;
+  // 2. Hard Security Check
+  let user = null;
+  if (session?.user?.email) {
+    user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    
+    // ✅ FIX: If session exists but User is NOT in DB, force a full logout
+    // This clears the cookies and redirects them to the sign-in page
+    if (!user) {
+      return redirect("/api/auth/signout?callbackUrl=/api/auth/signin");
+    }
+  }
 
-  const enrollment = user 
-    ? await prisma.userProgress.findFirst({
+  // 3. Enrollment Check
+  const enrollment = (user && id)
+    ? await prisma.enrollment.findUnique({
         where: { 
-          userId: user.id, 
-          lesson: { courseId: id } 
+          userId_courseId: {
+            userId: user.id,
+            courseId: id
+          }
         }
       })
     : null;
-// ... (keep the top part of your code the same)
 
   return (
     <div className="min-h-screen bg-white">
@@ -51,15 +64,21 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
               <p className="text-slate-400 text-lg max-w-xl mb-8 leading-relaxed">{course.description}</p>
               
               {!enrollment ? (
-                <EnrollButton courseId={id} />
+                /* Passing current user id to help the button avoid "User not found" errors */
+                <EnrollButton courseId={id} userId={user?.id} />
               ) : (
-                /* ✅ FIXED LINK 1: Point to the classroom page */
-                <Link href={`/courses/${id}`} className="bg-white text-slate-900 px-8 py-4 rounded-2xl font-black flex items-center gap-2 w-fit hover:bg-yellow-400 transition-all shadow-xl">
+                <Link 
+                  href={`/courses/${id}/lessons/${course.lessons[0]?.id || ''}`} 
+                  className="bg-white text-slate-900 px-8 py-4 rounded-2xl font-black flex items-center gap-2 w-fit hover:bg-yellow-400 transition-all shadow-xl"
+                >
                   CONTINUE LEARNING <Play size={18} fill="currentColor"/>
                 </Link>
               )}
             </div>
             <div className="w-full md:w-1/3 aspect-square bg-slate-800 rounded-[3rem] border border-slate-700 flex items-center justify-center shadow-2xl relative overflow-hidden group">
+               {course.image && (
+                 <img src={course.image} alt={course.title} className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity" />
+               )}
                <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-transparent opacity-50" />
                <Play size={80} className="text-white/20 group-hover:text-yellow-400 transition-colors relative z-10" />
             </div>
@@ -87,18 +106,21 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
                   </div>
                 </div>
                 {enrollment ? (
-                  /* ✅ FIXED LINK 2: Use query parameters for lesson selection */
-                  <Link href={`/courses/${id}?lessonId=${lesson.id}`} className="text-slate-900 hover:text-yellow-600 font-black text-sm flex items-center gap-1">
+                  <Link href={`/courses/${id}/lessons/${lesson.id}`} className="text-slate-900 hover:text-yellow-600 font-black text-sm flex items-center gap-1">
                     START <Play size={14} fill="currentColor" />
                   </Link>
                 ) : (
-                  <Lock size={18} className="text-slate-200" />
+                  <div className="flex items-center gap-2 text-slate-300">
+                    <span className="text-[10px] font-black uppercase tracking-widest">Locked</span>
+                    <Lock size={18} />
+                  </div>
                 )}
               </div>
             ))}
           </div>
         </div>
       </div>
+      <div className="pb-20" />
     </div>
   );
 }

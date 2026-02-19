@@ -1,110 +1,129 @@
-import { PrismaClient } from '@prisma/client';
-
+const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🚀 Starting complete database seed...");
+  console.log("Start seeding...");
 
-  // 1. Create a Teacher
-  const teacher = await prisma.teacher.upsert({
-    where: { id: 'teacher-1' },
-    update: {},
-    create: {
-      id: 'teacher-1',
-      name: "Sarah Johnson",
-      role: "Senior English Instructor",
+  // 1. Clean the database (Optional, but recommended for development)
+  // Delete in order of dependencies (child records first)
+  await prisma.submission.deleteMany();
+  await prisma.assignment.deleteMany();
+  await prisma.examResult.deleteMany();
+  await prisma.exam.deleteMany();
+  await prisma.userProgress.deleteMany();
+  await prisma.materialProgress.deleteMany();
+  await prisma.material.deleteMany();
+  await prisma.announcementView.deleteMany();
+  await prisma.announcement.deleteMany();
+  await prisma.enrollment.deleteMany();
+  await prisma.lesson.deleteMany();
+  await prisma.course.deleteMany();
+  await prisma.teacher.deleteMany();
+  await prisma.user.deleteMany();
+
+  // 2. Create a Teacher
+  const teacher = await prisma.teacher.create({
+    data: {
+      name: "Dr. Sarah Jenkins",
+      role: "Senior Full Stack Developer",
       image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-      bio: "Expert in ESL and Proficiency Exam preparation with 10 years of experience.",
-      expertise: ["IELTS", "TOEFL", "Business English"],
+      bio: "Expert in Next.js and Database Architecture with 10+ years of experience.",
+      rating: 4.9,
+      expertise: ["React", "Prisma", "PostgreSQL", "Tailwind CSS"],
     },
   });
 
-  // 2. Create a Course
-  const course = await prisma.course.upsert({
-    where: { id: 'course-1' },
-    update: {},
-    create: {
-      id: 'course-1',
-      title: "Mastering Advanced English",
-      description: "A comprehensive course covering advanced grammar and speaking.",
+  // 3. Create a User (Student)
+  const student = await prisma.user.create({
+    data: {
+      name: "John Doe",
+      email: "student@example.com",
+      role: "USER",
+    },
+  });
+
+  // 4. Create a Course
+  const course = await prisma.course.create({
+    data: {
+      title: "Mastering Prisma & Next.js",
+      description: "A comprehensive guide to building modern web applications with typesafe databases.",
       price: 49.99,
-      thumbnail: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8",
+      image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee",
       teacherId: teacher.id,
     },
   });
 
-  // 3. Create Lessons
-  const lesson1 = await prisma.lesson.upsert({
-    where: { id: 'lesson-1' },
-    update: {},
-    create: {
-      id: 'lesson-1',
-      title: "Introduction to Advanced Syntax",
-      content: "In this lesson, we explore complex sentence structures and nuances.",
-      videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  // 5. Enroll the student in the course
+  await prisma.enrollment.create({
+    data: {
+      userId: student.id,
+      courseId: course.id,
+    },
+  });
+
+  // 6. Create Lessons
+  const lesson1 = await prisma.lesson.create({
+    data: {
+      title: "Introduction to ORMs",
+      content: "In this lesson, we cover the basics of Object-Relational Mapping.",
       order: 1,
       courseId: course.id,
+      videoUrl: "https://www.youtube.com/watch?v=reP1px1fshA",
     },
   });
 
-  const lesson2 = await prisma.lesson.upsert({
-    where: { id: 'lesson-2' },
-    update: {},
-    create: {
-      id: 'lesson-2',
-      title: "Idioms and Phrasal Verbs",
-      content: "Mastering common expressions used by native speakers.",
-      videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  const lesson2 = await prisma.lesson.create({
+    data: {
+      title: "Setting up your Schema",
+      content: "Learning how to define models and relations in Prisma.",
       order: 2,
       courseId: course.id,
+      videoUrl: "https://www.youtube.com/watch?v=F_fP8K_uO_0",
     },
   });
 
-  // 4. Create Exams for Lesson 1
-  await prisma.exam.upsert({
-    where: { id: 'exam-1' },
-    update: { lessonId: lesson1.id },
-    create: {
-      id: 'exam-1',
-      title: "Syntax Proficiency Test",
+  // 7. Create Materials for Lesson 1
+  await prisma.material.create({
+    data: {
+      title: "Getting Started PDF",
+      fileUrl: "https://example.com/guide.pdf",
+      fileType: "PDF",
       lessonId: lesson1.id,
     },
   });
 
-  // 5. Create Assignments for Lesson 1
-  await prisma.assignment.upsert({
-    where: { id: 'assignment-1' },
-    update: { lessonId: lesson1.id },
-    create: {
-      id: 'assignment-1',
-      title: "Essay: Structural Analysis",
-      lessonId: lesson1.id,
+  // 8. Create an Assignment for Lesson 2
+  const assignment = await prisma.assignment.create({
+    data: {
+      title: "Schema Design Challenge",
+      description: "Create a schema for a blog application.",
+      lessonId: lesson2.id,
     },
   });
 
-  // 6. Create Course Announcements
-  await prisma.announcement.upsert({
-    where: { id: 'ann-1' },
-    update: { courseId: course.id },
-    create: {
-      id: 'ann-1',
-      title: "Welcome to the Masterclass!",
-      content: "We are excited to have you here. Check the curriculum to get started.",
+  // 9. Create an Announcement for the Course
+  await prisma.announcement.create({
+    data: {
+      title: "Welcome to the Course!",
+      content: "I'm excited to have you all here. Let's start building!",
       courseId: course.id,
     },
   });
 
-  console.log({
-    message: "✅ Seed successful",
-    teacher: teacher.name,
-    course: course.title,
-    lessons: 2,
+  // 10. Create an Exam for Lesson 2
+  await prisma.exam.create({
+    data: {
+      title: "Prisma Basics Quiz",
+      lessonId: lesson2.id,
+    },
   });
+
+  console.log("Seeding finished successfully.");
 }
 
 main()
   .catch((e) => {
-    console.error("❌ Seed failed:", e);
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {
