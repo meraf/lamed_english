@@ -2,9 +2,8 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { PlayCircle, ChevronLeft, BookOpen } from "lucide-react";
 
-// Helper to convert YouTube/Vimeo links to Embed links
-// Updated to accept string | null to match Prisma types
-function getEmbedUrl(url: string | null) {
+// 1. Updated helper to accept 'string | null' to fix the Vercel Type Error
+function getEmbedUrl(url: string | null): string {
   if (!url) return "";
   
   if (url.includes("youtube.com") || url.includes("youtu.be")) {
@@ -22,20 +21,18 @@ function getEmbedUrl(url: string | null) {
   return url;
 }
 
+// 2. Define Props Interface for Next.js 15/16
 interface PageProps {
   params: Promise<{ courseId: string }>;
   searchParams: Promise<{ lessonId?: string }>;
 }
 
 export default async function LearnPage({ params, searchParams }: PageProps) {
-  // 1. Await params for Next.js 15 compatibility
-  const resolvedParams = await params;
-  const resolvedSearchParams = await searchParams;
-  
-  const courseId = resolvedParams.courseId;
-  const lessonId = resolvedSearchParams.lessonId;
+  // 3. Await params & searchParams (Required in Next.js 15+)
+  const { courseId } = await params;
+  const { lessonId } = await searchParams;
 
-  // 2. Fetch Course & Lessons
+  // 4. Fetch Course & Lessons
   const course = await prisma.course.findUnique({
     where: { id: courseId },
     include: { lessons: { orderBy: { order: 'asc' } } }
@@ -43,23 +40,22 @@ export default async function LearnPage({ params, searchParams }: PageProps) {
 
   if (!course) {
     return (
-      <div className="p-20 text-center flex flex-col items-center gap-4">
-        <h1 className="text-2xl font-black">Course not found.</h1>
-        <Link href="/dashboard" className="text-blue-500 underline">Back to Dashboard</Link>
+      <div className="p-20 text-center font-black bg-slate-900 text-white min-h-screen">
+        Course not found.
       </div>
     );
   }
 
-  // 3. Set Active Lesson
+  // 5. Set Active Lesson (logic handled safely)
   const activeLesson = lessonId 
     ? course.lessons.find(l => l.id === lessonId) 
     : course.lessons[0];
 
   if (!activeLesson) {
     return (
-      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center text-white p-6">
-        <h1 className="text-2xl font-black mb-4 uppercase italic">No lessons in this course yet.</h1>
-        <Link href="/dashboard" className="bg-yellow-400 text-slate-900 px-6 py-2 rounded-xl font-black border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]">
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-6">
+        <h1 className="text-2xl font-black mb-4 uppercase italic tracking-tighter">No lessons here yet.</h1>
+        <Link href="/dashboard" className="bg-yellow-400 text-slate-900 px-6 py-2 rounded-xl font-bold hover:scale-105 transition-transform">
           Return to Dashboard
         </Link>
       </div>
@@ -73,14 +69,14 @@ export default async function LearnPage({ params, searchParams }: PageProps) {
       <div className="flex-1 flex flex-col">
         {/* Top Header */}
         <div className="p-4 bg-[#1e293b] border-b border-slate-800 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2 text-[10px] font-black text-slate-400 hover:text-white transition-all uppercase tracking-[0.2em]">
-            <ChevronLeft size={14} /> Exit Classroom
+          <Link href="/dashboard" className="flex items-center gap-2 text-[10px] font-black text-slate-400 hover:text-white transition-all uppercase tracking-widest">
+            <ChevronLeft size={16} /> Exit Classroom
           </Link>
-          <span className="text-[10px] font-black text-yellow-400 uppercase tracking-widest">{course.title}</span>
+          <span className="text-[10px] font-black text-yellow-400 uppercase tracking-tighter">{course.title}</span>
         </div>
 
         {/* Player Container */}
-        <div className="w-full aspect-video bg-black shadow-2xl relative">
+        <div className="w-full aspect-video bg-black shadow-2xl overflow-hidden rounded-xl">
           {activeLesson.videoUrl ? (
             <iframe 
               src={getEmbedUrl(activeLesson.videoUrl)} 
@@ -89,26 +85,25 @@ export default async function LearnPage({ params, searchParams }: PageProps) {
               allowFullScreen 
             />
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-2">
-              <PlayCircle size={48} className="opacity-20" />
-              <p className="font-black uppercase tracking-tighter italic">No video available for this session</p>
+            <div className="flex flex-col items-center justify-center h-full text-slate-500 font-bold gap-3">
+              <PlayCircle size={40} className="opacity-20" />
+              <p className="uppercase text-xs tracking-widest">No video available for this session</p>
             </div>
           )}
         </div>
 
         {/* Lesson Description Area */}
         <div className="p-8 md:p-12 max-w-4xl">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="px-3 py-1 bg-yellow-400/10 rounded-lg text-[10px] font-black uppercase text-yellow-500 border border-yellow-400/20">
+          <h1 className="text-4xl font-black text-white tracking-tight mb-4 uppercase italic">
+            {activeLesson.title}
+          </h1>
+          <div className="flex items-center gap-4 mb-6">
+            <span className="px-3 py-1 bg-yellow-400/10 rounded-full text-[10px] font-black uppercase text-yellow-500 border border-yellow-400/20">
               Module {activeLesson.order}
             </span>
           </div>
-          <h1 className="text-4xl font-black text-white tracking-tighter uppercase italic mb-6">
-            {activeLesson.title}
-          </h1>
-          
           <div className="prose prose-invert max-w-none">
-            <p className="text-slate-400 leading-relaxed font-medium text-lg border-l-4 border-slate-700 pl-6 italic">
+            <p className="text-slate-400 leading-relaxed font-medium text-lg border-l-4 border-slate-700 pl-6">
               {activeLesson.content || "Focus on the video above. Take notes and prepare any questions for your instructor. Consistency is the key to mastering English."}
             </p>
           </div>
@@ -134,25 +129,23 @@ export default async function LearnPage({ params, searchParams }: PageProps) {
                 href={`/learn/${courseId}?lessonId=${lesson.id}`}
                 className={`flex items-center gap-4 p-5 border-b border-slate-800/50 transition-all ${
                   isActive 
-                    ? 'bg-slate-800/80 border-l-4 border-l-yellow-400' 
+                    ? 'bg-slate-800/50 border-l-4 border-l-yellow-400 shadow-inner' 
                     : 'hover:bg-slate-800/30 border-l-4 border-l-transparent'
                 }`}
               >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-black text-sm border-2 ${
-                  isActive 
-                    ? 'bg-yellow-400 text-slate-900 border-slate-900 shadow-[2px_2px_0px_0px_rgba(255,255,255,0.2)]' 
-                    : 'bg-slate-700 text-slate-400 border-slate-800'
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 font-black text-sm ${
+                  isActive ? 'bg-yellow-400 text-slate-900' : 'bg-slate-700 text-slate-400'
                 }`}>
-                  {String(index + 1).padStart(2, '0')}
+                  {index + 1}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className={`text-sm font-black truncate uppercase italic ${isActive ? 'text-white' : 'text-slate-400'}`}>
+                  <h3 className={`text-sm font-bold truncate uppercase ${isActive ? 'text-white' : 'text-slate-400'}`}>
                     {lesson.title}
                   </h3>
                   <div className="flex items-center gap-2 mt-1">
                      <PlayCircle size={12} className={isActive ? 'text-yellow-400' : 'text-slate-600'} />
                      <span className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'text-slate-300' : 'text-slate-500'}`}>
-                        {isActive ? 'Currently Watching' : 'Session Video'}
+                        {isActive ? 'Watching Now' : 'Session Video'}
                      </span>
                   </div>
                 </div>
