@@ -3,36 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // ✅ Required for Supabase Port 5432
 }
 
-// --- AUTH & USER ---
-model User {
-  id                String             @id @default(cuid())
-  name              String?
-  email             String?            @unique
-  hashedPassword    String?
-  emailVerified     DateTime?
-  image             String?
-  role              Role               @default(USER)
-  
-  // Relations
-  accounts          Account[]
-  sessions          Session[]
-  enrolledCourses   Enrollment[]
-  progress          UserProgress[]
-  materialProgress  MaterialProgress[]
-  
-  // Submission Relations
-  submissions       Submission[]       // For Assignments
-  examResults       ExamResult[]       // For Exams
-  
-  // Communication & Social
-  announcementViews AnnouncementView[]
-  receivedMessages  Message[]          @relation("ReceivedMessages")
-  sentMessages      Message[]          @relation("SentMessages")
-}
+// --- AUTH & USER ROLES ---
 
 enum Role {
   USER
@@ -40,56 +16,119 @@ enum Role {
   ADMIN
 }
 
-// --- TEACHERS & COURSES ---
+model User {
+  id                String             @id @default(cuid())
+  name              String?
+  email             String?            @unique
+  hashedPassword    String?
+  image             String?
+  role              Role               @default(USER)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  // Relations
+  enrolledCourses   Enrollment[]
+  progress          UserProgress[]
+  materialProgress  MaterialProgress[] // ✅ Restored
+  submissions       Submission[]       
+  examResults       ExamResult[]       
+  announcementViews AnnouncementView[] // ✅ Restored
+  sentMessages      Message[]          @relation("SentMessages")
+  receivedMessages  Message[]          @relation("ReceivedMessages")
+}
+
 model Teacher {
   id        String   @id @default(cuid())
   name      String
-  role      String
-  image     String
   bio       String
-  rating    Float    @default(5.0)
-  expertise String[]
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
   courses   Course[]
 }
 
+// --- COURSE & INDIVIDUAL STUDENT LOGIC ---
+
 model Course {
-  id            String         @id @default(cuid())
-  title         String
-  description   String
-  price         Float
-  thumbnail     String?
-  image         String?
-  teacherId     String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id          String       @id @default(cuid())
+  title       String
+  description String
+  image       String?
+  teacherId   String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   
   teacher       Teacher        @relation(fields: [teacherId], references: [id])
-  users         Enrollment[]
   lessons       Lesson[]
-  announcements Announcement[]
+  enrollments   Enrollment[]
+  announcements Announcement[] // ✅ Restored
 }
 
 model Enrollment {
-  id        String   @id @default(cuid())
-  userId    String
-  courseId  String
-  createdAt DateTime @default(now())
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  userId         String
+  courseId       String
+  createdAt      DateTime      @default(now())
+
+  // ✅ PER-STUDENT SETTINGS
+  googleMeetLink String?       
+  
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course         Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  appointments   Appointment[]
 
   @@unique([userId, courseId])
 }
 
-// --- LESSONS & CONTENT ---
+model Appointment {
+  id           String     @id @default(cuid())
+  enrollmentId String
+  dayOfWeek    String     // e.g., "Monday"
+  startTime    String     // e.g., "10:30 AM"
+  
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+// --- ANNOUNCEMENTS SYSTEM ---
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @db.Text
+  courseId  String
+  createdAt DateTime @default(now())
+
+  course    Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  views     AnnouncementView[] // ✅ Restored
+}
+
+model AnnouncementView {
+  id             String       @id @default(cuid())
+  announcementId String
+  userId         String
+  viewedAt       DateTime     @default(now())
+
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+}
+
+// --- CONTENT & PROGRESS ---
+
 model Lesson {
-  id          String         @id @default(cuid())
+  id          String       @id @default(cuid())
   title       String
-  videoUrl    String?
-  content     String?        @db.Text
+  videoUrl    String?      
+  content     String?      @db.Text
   order       Int
   courseId    String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
   
-  course      Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   materials   Material[]
   assignments Assignment[]
   exams       Exam[]
@@ -97,23 +136,34 @@ model Lesson {
 }
 
 model Material {
-  id       String @id @default(cuid())
-  title    String
-  fileUrl  String
-  fileType String
-  lessonId String
-  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  id        String @id @default(cuid())
+  title     String
+  fileUrl   String 
+  lessonId  String
+  lesson    Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   
-  progress MaterialProgress[]
+  progress  MaterialProgress[] // ✅ Restored
 }
 
-// --- ASSIGNMENTS & EXAMS (The New Parts) ---
+model MaterialProgress {
+  id         String   @id @default(cuid())
+  userId     String
+  materialId String
+  completed  Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, materialId])
+}
+
+// --- GRADING & SUBMISSIONS ---
 
 model Assignment {
   id          String       @id @default(cuid())
   title       String
   description String?      @db.Text
-  fileUrl     String?      // Template file for students to download
   lessonId    String
   lesson      Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   submissions Submission[]
@@ -123,87 +173,50 @@ model Submission {
   id           String     @id @default(cuid())
   userId       String
   assignmentId String
-  fileUrl      String?    // The student's uploaded work
-  content      String?    @db.Text
-  status       String     @default("SUBMITTED") // Added for tracking
+  fileUrl      String?    
+  content      String?    @db.Text 
+  status       String     @default("SUBMITTED") 
+  score        Float?     
   createdAt    DateTime   @default(now())
   
-  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id])
+  assignment   Assignment @relation(fields: [assignmentId], references: [id])
 }
 
 model Exam {
-  id          String       @id @default(cuid())
-  title       String
-  description String?      @db.Text
-  fileUrl     String?      // Exam paper
-  lessonId    String
-  lesson      Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  results     ExamResult[]
+  id       String       @id @default(cuid())
+  title    String
+  lessonId String
+  lesson   Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  results  ExamResult[]
 }
 
 model ExamResult {
-  id          String   @id @default(cuid())
-  userId      String
-  examId      String
-  
-  // Support for multiple answer types
-  textAnswer  String?  @db.Text
-  fileUrl     String?  // PDF upload
-  audioUrl    String?  // Speaking/Voice upload
-  
-  score       Float?
-  createdAt   DateTime @default(now())
-  
-  exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// --- PROGRESS & SYSTEM ---
-
-model UserProgress {
-  id          String   @id @default(cuid())
-  userId      String
-  lessonId    String
-  isCompleted Boolean  @default(false) // Changed default to false for logic
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, lessonId])
-}
-
-model MaterialProgress {
   id         String   @id @default(cuid())
   userId     String
-  materialId String
+  examId     String
+  textAnswer String?  @db.Text
+  fileUrl    String?  
+  score      Float?   
   createdAt  DateTime @default(now())
-  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, materialId])
+  
+  user       User     @relation(fields: [userId], references: [id])
+  exam       Exam     @relation(fields: [examId], references: [id])
 }
 
-model Announcement {
-  id        String             @id @default(cuid())
-  title     String
-  content   String             @db.Text
-  courseId  String
-  createdAt DateTime           @default(now())
-  course    Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  viewers   AnnouncementView[]
-}
+// --- SYSTEM & MESSAGING ---
 
-model AnnouncementView {
-  id             String       @id @default(cuid())
-  userId         String
-  announcementId String
-  createdAt      DateTime     @default(now())
-  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+model UserProgress {
+  id        String   @id @default(cuid())
+  userId    String
+  lessonId  String
+  completed Boolean  @default(false)
+  updatedAt DateTime @updatedAt
 
-  @@unique([userId, announcementId])
+  user      User     @relation(fields: [userId], references: [id])
+  lesson    Lesson   @relation(fields: [lessonId], references: [id])
+
+  @@unique([userId, lessonId])
 }
 
 model Message {
@@ -212,41 +225,7 @@ model Message {
   senderId   String
   receiverId String
   createdAt  DateTime @default(now())
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  
   sender     User     @relation("SentMessages", fields: [senderId], references: [id])
-}
-
-// Auth.js Boilerplate
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
 }
