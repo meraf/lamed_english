@@ -20,16 +20,29 @@ export async function POST(req: Request) {
     if (!user) return new NextResponse("User not found", { status: 404 });
 
     if (isCompleted) {
-      // Mark as completed
+      // ✅ Using "completed" to match your schema.prisma
       await prisma.userProgress.upsert({
-        where: { userId_lessonId: { userId: user.id, lessonId: lessonId } },
-        update: { isCompleted: true },
-        create: { userId: user.id, lessonId: lessonId, isCompleted: true },
+        where: { 
+          userId_lessonId: { 
+            userId: user.id, 
+            lessonId: lessonId 
+          } 
+        },
+        update: { 
+          completed: true 
+        },
+        create: { 
+          userId: user.id, 
+          lessonId: lessonId, 
+          completed: true 
+        },
       });
     } else {
-      // Un-mark completion (if they click it again)
       await prisma.userProgress.deleteMany({
-        where: { userId: user.id, lessonId: lessonId },
+        where: { 
+          userId: user.id, 
+          lessonId: lessonId 
+        },
       });
     }
 
