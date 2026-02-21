@@ -132,6 +132,7 @@ await prisma.userProgress.create({
   }
 })}
   revalidatePath('/dashboard')
+  
   revalidatePath(`/lessons/${lessonId}`)
   
   return { success: true }
