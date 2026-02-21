@@ -34,7 +34,7 @@ export async function enrollUser(courseId: string) {
       data: {
         userId: user.id,
         lessonId: firstLesson.id,
-        isCompleted: false
+    completed: true // ✅ Correct: matches your schema.prisma
       }
     });
   }
