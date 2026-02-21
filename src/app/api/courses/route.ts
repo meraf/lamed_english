@@ -1,48 +1,60 @@
-import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const session = await getServerSession(authOptions);
+    
+    // ✅ Clean access thanks to our Module Augmentation in lib/auth.ts
+    const userId = session?.user?.id;
+    const userRole = session?.user?.role;
 
-    // 1. Validation: Ensure required fields are present
-    if (!body.title || !body.teacherId || !body.price) {
-      return NextResponse.json(
-        { error: "Title, Teacher, and Price are mandatory." },
-        { status: 400 }
-      );
+    // Only allow ADMIN or TEACHER to create courses
+    if (!session || !userId || (userRole !== "ADMIN" && userRole !== "TEACHER")) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const body = await req.json();
+    const { title, description, image, category, level } = body;
+
+    // 1. Ensure Teacher Profile exists
+    let teacher = await prisma.teacher.findUnique({
+      where: { userId: userId }
+    });
+
+    if (!teacher) {
+      teacher = await prisma.teacher.create({
+        data: {
+          bio: "New Teacher Profile",
+          user: { connect: { id: userId } }
+        }
+      });
+      
+      // Sync the user role in the DB if they weren't already marked
+      await prisma.user.update({
+        where: { id: userId },
+        data: { role: "TEACHER" }
+      });
     }
 
     // 2. Create the course
     const course = await prisma.course.create({
       data: {
-        title: body.title,
-        description: body.description,
-        thumbnail: body.thumbnail || null,
-        price: parseFloat(body.price), // Convert string from form to Float
-        teacherId: body.teacherId,     // Link to the teacher
-      }
+        title,
+        description,
+        image,
+        // Check if these fields exist in your schema before pushing
+        ...(category && { category }),
+        ...(level && { level }),
+        teacher: { connect: { id: teacher.id } },
+      },
     });
 
     return NextResponse.json(course);
-  } catch (error: any) {
-    console.error("COURSE_POST_ERROR:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
-      { status: 500 }
-    );
-  }
-}
-
-// GET all courses
-export async function GET() {
-  try {
-    const courses = await prisma.course.findMany({
-      include: { teacher: true },
-      orderBy: { createdAt: 'desc' }
-    });
-    return NextResponse.json(courses);
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch courses" }, { status: 500 });
+    console.error("[COURSES_POST]", error);
+    return new NextResponse("Internal Error", { status: 500 });
   }
 }

@@ -2,21 +2,42 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { NextAuthOptions } from "next-auth";
-import bcrypt from "bcrypt";
+import { NextAuthOptions, DefaultSession } from "next-auth";
+import { Adapter } from "next-auth/adapters"; // Import Adapter specifically
+import bcrypt from "bcryptjs";
+
+// ✅ 1. MODULE AUGMENTATION: Correctly extending the types
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      role: string;
+    } & DefaultSession["user"];
+  }
+
+  interface User {
+    id: string; // Ensure id is recognized
+    role: string;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    sub: string;
+    role: string;
+  }
+}
 
 export const authOptions: NextAuthOptions = {
-  // Connects NextAuth to your database via Prisma
-  adapter: PrismaAdapter(prisma),
+  // ✅ 2. FIX: Casting the adapter to "Adapter" breaks the type mismatch loop
+  adapter: PrismaAdapter(prisma) as Adapter,
   
   providers: [
-    // 1. Google Login
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
-    // 2. Email & Password Login
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -45,7 +66,12 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Incorrect password.');
         }
 
-        return user;
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role, 
+        };
       }
     })
   ],
@@ -58,21 +84,17 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt", 
   },
 
-  // ⬇️ THIS IS THE IMPORTANT PART WE UPDATED ⬇️
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
-        // @ts-ignore - Pass the role to the token
         token.role = user.role; 
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        // @ts-ignore - Pass the id to the session
         session.user.id = token.sub;
-        // @ts-ignore - Pass the role to the session so Middleware can see it
         session.user.role = token.role; 
       }
       return session;
