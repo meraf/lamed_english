@@ -124,15 +124,13 @@ export async function toggleLessonProgress(lessonId: string) {
       }
     })
   } else {
-    await prisma.userProgress.create({
-      data: {
-        userId: user.id,
-        lessonId: lessonId,
-        isCompleted: true
-      }
-    })
+await prisma.userProgress.create({
+  data: {
+    userId: user.id,
+    lessonId: lessonId,
+    completed: true // ✅ Correct: matches your schema.prisma
   }
-
+})}
   revalidatePath('/dashboard')
   revalidatePath(`/lessons/${lessonId}`)
   
