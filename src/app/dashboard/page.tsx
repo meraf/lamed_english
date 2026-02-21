@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image"; 
-import { BookOpen, CheckCircle, PlayCircle, GraduationCap, ArrowRight } from "lucide-react";
+import { BookOpen, CheckCircle, PlayCircle, ArrowRight } from "lucide-react";
 import { UnenrollButton } from "@/app/components/UnenrollButton";
 
 export default async function DashboardPage() {
@@ -34,8 +34,9 @@ export default async function DashboardPage() {
         }
       },
       progress: {
-        where: { isCompleted: true },
-        orderBy: { createdAt: 'desc' },
+        // ✅ FIXED: Changed isCompleted to completed to match your schema
+        where: { completed: true },
+        orderBy: { updatedAt: 'desc' },
         include: {
           lesson: { select: { title: true } }
         }
@@ -55,10 +56,11 @@ export default async function DashboardPage() {
 
   // Logic for Weekly Goal
   const weeklyGoal = 5;
-  const lessonsThisWeek = user.progress.filter(p => new Date(p.createdAt) >= startOfWeek).length;
+  const lessonsThisWeek = user.progress.filter(p => new Date(p.updatedAt) >= startOfWeek).length;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
+      {/* HEADER SECTION */}
       <div className="bg-slate-900 pt-32 pb-20 px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-end gap-6">
           <div>
@@ -83,16 +85,23 @@ export default async function DashboardPage() {
       <main className="max-w-7xl mx-auto px-8 -mt-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           
+          {/* COURSE LIST */}
           <div className="lg:col-span-2 space-y-6">
             <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
               <PlayCircle size={18} /> Continue Learning
             </h2>
 
+            {user.enrolledCourses.length === 0 && (
+              <div className="bg-white rounded-[2.5rem] p-20 text-center border border-dashed border-slate-300">
+                <p className="font-bold text-slate-400 uppercase tracking-widest">No courses enrolled yet</p>
+                <Link href="/courses" className="text-yellow-500 font-black text-xs uppercase mt-4 block">Browse Catalog</Link>
+              </div>
+            )}
+
             {user.enrolledCourses.map((enrollment) => {
               const course = enrollment.course;
               const progressPercent = calculateProgress(course.lessons);
-              const firstLessonId = course.lessons[0]?.id;
-              const imageUrl = (course as any).thumbnail || (course as any).image;
+              const imageUrl = course.image;
 
               return (
                 <div key={course.id} className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
@@ -101,7 +110,7 @@ export default async function DashboardPage() {
                       {imageUrl ? (
                         <Image src={imageUrl} alt="" fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center"><BookOpen className="text-slate-300" /></div>
+                        <div className="w-full h-full flex items-center justify-center bg-slate-200"><BookOpen className="text-slate-400" /></div>
                       )}
                     </div>
 
@@ -122,12 +131,12 @@ export default async function DashboardPage() {
                       </div>
 
                       <div className="flex items-center justify-between gap-4 pt-2">
-                        {/* ✅ FIXED LINK: Points to the actual classroom lesson to avoid 404 */}
+                        {/* ✅ FIXED LINK: Points to your classroom page */}
                         <Link 
-                          href={firstLessonId ? `/courses/${course.id}/lessons/${firstLessonId}` : `/courses/${course.id}`} 
+                          href={`/learn/${course.id}`} 
                           className="flex items-center justify-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-2xl font-black hover:bg-yellow-400 hover:text-slate-900 transition-all text-sm uppercase tracking-widest"
                         >
-                          Go to Class <ArrowRight size={16} />
+                          Open Classroom <ArrowRight size={16} />
                         </Link>
                       </div>
                     </div>
@@ -137,8 +146,9 @@ export default async function DashboardPage() {
             })}
           </div>
 
+          {/* SIDEBAR */}
           <div className="space-y-8">
-            {/* WEEKLY GOAL SECTION */}
+            {/* WEEKLY GOAL */}
             <div className="bg-yellow-400 rounded-[3rem] p-10 shadow-xl shadow-yellow-400/20">
               <h3 className="text-2xl font-black text-slate-900 mb-2">Weekly Goal</h3>
               <p className="text-slate-900/60 text-xs font-bold uppercase tracking-widest mb-6">
@@ -151,19 +161,20 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* MILESTONES SECTION */}
+            {/* MILESTONES */}
             <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm">
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6 border-b pb-4">Recent Milestones</h3>
               <div className="space-y-6">
+                {user.progress.length === 0 && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No activity yet</p>}
                 {user.progress.slice(0, 5).map((p, i) => (
                   <div key={i} className="flex gap-4 items-start">
                     <div className="bg-green-100 text-green-600 p-2 rounded-xl"><CheckCircle size={16} /></div>
                     <div>
                       <p className="text-xs font-black text-slate-900 line-clamp-1">
-                        {(p as any).lesson?.title || "Lesson Completed"}
+                        {p.lesson?.title || "Lesson Completed"}
                       </p>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">
-                        {new Date(p.createdAt).toLocaleDateString()}
+                        {new Date(p.updatedAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
