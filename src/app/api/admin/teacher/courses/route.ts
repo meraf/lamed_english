@@ -20,7 +20,7 @@ export async function POST(req: Request) {
         title: body.title,
         description: body.description,
         price: parseFloat(body.price),
-        thumbnail: body.thumbnail,
+        image: body.thumbnail,
         teacherId: body.teacherId,
       }
     });
