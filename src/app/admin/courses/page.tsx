@@ -2,96 +2,93 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
-import { BookPlus, Image as ImageIcon, Loader2, DollarSign, AlertCircle } from 'lucide-react';
+import { BookPlus, Image as ImageIcon, Loader2 } from 'lucide-react';
 
 export default function AdminAddCourse() {
-  const [teachers, setTeachers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [scriptLoaded, setScriptLoaded] = useState(false); // Track script status
+  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    thumbnail: '',
     price: '',
-    teacherId: ''
+    thumbnail: '',
+    teacherId: '',
+    category: 'English', // Default value
+    level: 'Beginner'    // Default value
   });
 
   const router = useRouter();
 
-  // Load teachers
+  // 1. Fetch Teachers and Force-Check Cloudinary Script
   useEffect(() => {
-    fetch('/api/teachers')
-      .then(res => res.json())
-      .then(data => {
+    async function fetchTeachers() {
+      try {
+        const res = await fetch('/api/teachers');
+        const data = await res.json();
         if (Array.isArray(data)) setTeachers(data);
-      })
-      .catch(err => console.error("Error fetching teachers:", err));
+      } catch (err) {
+        console.error("Failed to load teachers");
+      }
+    }
+    fetchTeachers();
+
+    // Loop check for Cloudinary script (Fastest way to ensure availability)
+    const timer = setInterval(() => {
+      if ((window as any).cloudinary) {
+        setScriptLoaded(true);
+        clearInterval(timer);
+      }
+    }, 500);
+    return () => clearInterval(timer);
   }, []);
 
-  // ✅ Optimized Upload Handler
   const handleUpload = useCallback(() => {
-    if (!scriptLoaded) {
-      alert("Cloudinary library is still initializing. Please wait a moment.");
+    const windowAny = window as any;
+    if (!windowAny.cloudinary) {
+      alert("Cloudinary script is not ready yet. Please check your connection or Ad-Blockers.");
       return;
     }
 
-    const windowAny = window as any;
-    if (windowAny.cloudinary) {
-      const myWidget = windowAny.cloudinary.createUploadWidget(
-        {
-          cloudName: 'Lamed-English',
-          uploadPreset: 'lamed_preset',
-          sources: ['local', 'url', 'camera'],
-          multiple: false,
-          cropping: true, // Optional: helpful for course banners
-          styles: {
-            palette: {
-              window: "#FFFFFF",
-              sourceTabIcon: "#000000",
-              menuIcons: "#000000",
-              link: "#FACC15", // Matches your yellow theme
-              action: "#000000",
-              inProgress: "#FACC15",
-              complete: "#22C55E",
-              error: "#EF4444",
-              textDark: "#000000",
-              textLight: "#FFFFFF"
-            }
-          }
-        },
-        (error: any, result: any) => {
-          if (!error && result && result.event === "success") {
-            console.log("Done! Here is the info: ", result.info);
-            setFormData(prev => ({ ...prev, thumbnail: result.info.secure_url }));
-          }
+    const myWidget = windowAny.cloudinary.createUploadWidget(
+      {
+        cloudName: 'Lamed-English',
+        uploadPreset: 'lamed_preset',
+        sources: ['local', 'url'],
+        multiple: false,
+        cropping: true,
+        croppingAspectRatio: 1.5, // Course banners are wider
+      },
+      (error: any, result: any) => {
+        if (!error && result && result.event === "success") {
+          setFormData(prev => ({ ...prev, thumbnail: result.info.secure_url }));
         }
-      );
-      myWidget.open();
-    }
+      }
+    );
+    myWidget.open();
   }, [scriptLoaded]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.thumbnail) return alert("Please upload a thumbnail first!");
+    if (!formData.thumbnail) return alert("Please upload a course banner first!");
+    if (!formData.teacherId) return alert("Please assign an instructor!");
     
     setLoading(true);
     try {
       const res = await fetch('/api/courses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          price: parseFloat(formData.price)
-        }),
+        body: JSON.stringify(formData),
       });
 
+      const result = await res.json();
+
       if (res.ok) {
-        alert("Course created!");
-        router.push('/courses');
+        alert("Course published successfully!");
+        router.push('/admin/courses');
         router.refresh();
       } else {
-        const err = await res.json();
-        alert(`Error: ${err.message || "Failed"}`);
+        alert(result.details || result.error || "Error saving course.");
       }
     } catch (error) {
       alert("Network error.");
@@ -101,46 +98,45 @@ export default function AdminAddCourse() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-20 px-6">
-      {/* ✅ Strategy changed to lazyOnload to ensure window is ready */}
+    <div className="min-h-screen bg-slate-50 py-10 px-6">
       <Script 
         src="https://upload-widget.cloudinary.com/global/all.js" 
-        strategy="lazyOnload" 
-        onLoad={() => setScriptLoaded(true)}
+        strategy="beforeInteractive" 
       />
       
       <div className="max-w-3xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100">
-        <div className="bg-slate-900 p-12 text-white">
-          <h1 className="text-4xl font-black mb-2 tracking-tighter italic">New Course</h1>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Lamed English Admin</p>
+        <div className="bg-[#101827] p-12 text-center">
+          <div className="bg-yellow-400 w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <BookPlus className="text-slate-900" />
+          </div>
+          <h1 className="text-4xl font-black text-white mb-2 tracking-tighter">Add New Course</h1>
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Course Management Portal</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-12 space-y-8">
-          {/* Thumbnail Box */}
-          <div className="space-y-2">
+          {/* Banner Upload Area */}
+          <div className="space-y-4">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Course Banner</label>
             <div 
               onClick={handleUpload} 
               className={`border-4 border-dashed rounded-[2.5rem] p-10 text-center cursor-pointer transition-all ${
                 formData.thumbnail ? 'border-yellow-400 bg-yellow-50/30' : 'bg-slate-50 hover:border-yellow-400'
-              } ${!scriptLoaded ? 'opacity-50 cursor-wait' : ''}`}
+              }`}
             >
               {formData.thumbnail ? (
-                <div className="relative inline-block">
-                  <img src={formData.thumbnail} className="w-48 mx-auto rounded-xl shadow-lg border-2 border-white" alt="Preview"/>
-                  <p className="mt-4 text-[10px] font-black uppercase text-yellow-600">Click to change banner</p>
-                </div>
+                <img src={formData.thumbnail} className="w-full h-48 mx-auto rounded-2xl object-cover shadow-lg border-4 border-white" alt="Thumbnail"/>
               ) : (
                 <div className="text-slate-400 flex flex-col items-center gap-2">
                   <ImageIcon size={40} />
-                  <p className="font-bold text-xs uppercase tracking-tighter">
-                    {scriptLoaded ? "Upload Course Banner" : "Loading Cloudinary..."}
+                  <p className="font-bold text-xs uppercase">
+                    {scriptLoaded ? "Upload Banner" : "Loading Cloudinary..."}
                   </p>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <input 
               required
               className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold"
@@ -148,50 +144,46 @@ export default function AdminAddCourse() {
               value={formData.title}
               onChange={e => setFormData({...formData, title: e.target.value})}
             />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="relative">
-                <DollarSign className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  required
-                  type="number"
-                  step="0.01"
-                  className="w-full pl-14 pr-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold"
-                  placeholder="Price"
-                  value={formData.price}
-                  onChange={e => setFormData({...formData, price: e.target.value})}
-                />
-              </div>
-
-              <select 
-                required
-                className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold"
-                value={formData.teacherId}
-                onChange={e => setFormData({...formData, teacherId: e.target.value})}
-              >
-                <option value="">Assign Teacher</option>
-                {teachers.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <textarea 
+            <input 
               required
-              rows={4}
-              className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold resize-none"
-              placeholder="Description..."
-              value={formData.description}
-              onChange={e => setFormData({...formData, description: e.target.value})}
+              type="number"
+              step="0.01"
+              className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold"
+              placeholder="Price (USD)"
+              value={formData.price}
+              onChange={e => setFormData({...formData, price: e.target.value})}
             />
           </div>
+
+          <select 
+            required
+            className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold appearance-none"
+            value={formData.teacherId}
+            onChange={e => setFormData({...formData, teacherId: e.target.value})}
+          >
+            <option value="">Select Instructor</option>
+            {teachers.map(teacher => (
+              <option key={teacher.id} value={teacher.id}>
+                {teacher.name || teacher.user?.name || "Unnamed Instructor"}
+              </option>
+            ))}
+          </select>
+
+          <textarea 
+            required
+            rows={4}
+            className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-yellow-400 font-bold resize-none"
+            placeholder="Course description and syllabus..."
+            value={formData.description}
+            onChange={e => setFormData({...formData, description: e.target.value})}
+          />
 
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-slate-900 text-white py-6 rounded-2xl font-black hover:bg-yellow-400 hover:text-slate-900 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            className="w-full bg-[#101827] text-white py-6 rounded-2xl font-black hover:bg-yellow-400 hover:text-slate-900 transition-all uppercase tracking-widest text-sm"
           >
-            {loading ? <Loader2 className="animate-spin" /> : "CREATE COURSE"}
+            {loading ? <Loader2 className="animate-spin mx-auto" /> : "Publish Course"}
           </button>
         </form>
       </div>
