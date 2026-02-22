@@ -1,98 +1,153 @@
-const { PrismaClient } = require('@prisma/client');
+import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Start seeding...");
+  console.log("🌊 Flooding the database with data...");
 
-  // 1. Clean the database in order of dependencies (Child records first)
-  // These MUST match the models currently in your schema.prisma
-  console.log("Cleaning old data...");
-  await prisma.appointment.deleteMany();
-  await prisma.submission.deleteMany();
-  await prisma.assignment.deleteMany();
-  await prisma.examResult.deleteMany();
-  await prisma.exam.deleteMany();
-  await prisma.userProgress.deleteMany();
-  await prisma.material.deleteMany();
-  await prisma.enrollment.deleteMany();
-  await prisma.lesson.deleteMany();
-  await prisma.course.deleteMany();
-  await prisma.teacher.deleteMany();
-  await prisma.user.deleteMany();
+  // --- CLEANUP ---
+  // Delete in order to respect foreign key constraints
+  const tabels = [
+    prisma.message, prisma.announcementView, prisma.examResult, prisma.submission,
+    prisma.materialProgress, prisma.userProgress, prisma.appointment, prisma.enrollment,
+    prisma.exam, prisma.assignment, prisma.material, prisma.lesson,
+    prisma.announcement, prisma.course, prisma.teacher, prisma.user
+  ];
+  for (const table of tabels) { await table.deleteMany(); }
 
-  // 2. Create a Teacher
-  const teacher = await prisma.teacher.create({
+  // --- 1. THE TEACHER: FASIKA MASRESHA ---
+  const fasika = await prisma.user.create({
     data: {
-      name: "Dr. Sarah Jenkins",
-      image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-      bio: "Expert in Next.js and Database Architecture with 10+ years of experience.",
-    },
+      name: "Fasika Masresha",
+      email: "fasika@lamed.com",
+      role: "TEACHER",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/photo_2025-05-29_07-25-22-Lz7p...jpg", // Your uploaded photo
+      teacherProfile: {
+        create: {
+          bio: "Top-tier English educator with a focus on psychological linguistics and exam success.",
+          expertise: ["IELTS", "TOEFL", "Business English", "Phonetics"],
+          image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/photo_2025-05-29_07-25-22-Lz7p...jpg"
+        }
+      }
+    }
   });
+  const teacher = await prisma.teacher.findUnique({ where: { userId: fasika.id } });
 
-  // 3. Create a User (Student)
-  const student = await prisma.user.create({
-    data: {
-      name: "John Doe",
-      email: "student@example.com",
-      role: "USER",
-    },
-  });
+  // --- 2. THE STUDENTS (15 Total) ---
+  const students = [];
+  for (let i = 1; i <= 15; i++) {
+    const student = await prisma.user.create({
+      data: {
+        name: `Student ${i}`,
+        email: `student${i}@example.com`,
+        image: `https://api.dicebear.com/7.x/avataaars/svg?seed=${i}`,
+        role: "USER"
+      }
+    });
+    students.push(student);
+  }
 
-  // 4. Create a Course
-  const course = await prisma.course.create({
-    data: {
-      title: "Mastering Prisma & Next.js",
-      description: "A comprehensive guide to building modern web applications.",
-      image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee",
-      teacherId: teacher.id,
-    },
-  });
+  // --- 3. THE COURSES (4 Diverse Courses) ---
+  const categories = [
+    { title: "IELTS Mastery 2026", cat: "Exam Prep", level: "Advanced", price: 299 },
+    { title: "English for Tech Interviews", cat: "Business", level: "Intermediate", price: 150 },
+    { title: "Zero to Hero: Basic Grammar", cat: "General", level: "Beginner", price: 80 },
+    { title: "Public Speaking & Confidence", cat: "Soft Skills", level: "Advanced", price: 120 }
+  ];
 
-  // 5. Enroll the student & Set individual Mentorship details
-  const enrollment = await prisma.enrollment.create({
-    data: {
-      userId: student.id,
-      courseId: course.id,
-      googleMeetLink: "https://meet.google.com/abc-defg-hij",
-    },
-  });
+  for (const item of categories) {
+    const course = await prisma.course.create({
+      data: {
+        title: item.title,
+        description: `This is the ultimate ${item.title} course. Join Fasika Masresha to master these skills through 8 intensive modules, real-world exams, and direct feedback.`,
+        category: item.cat,
+        level: item.level,
+        price: item.price,
+        teacherId: teacher.id,
+        image: `https://res.cloudinary.com/lamed-english/image/upload/v1771664869/yhzhyrcx2kyphyvstaow.jpg`,
+        
+        // Add 8 Lessons per course
+        lessons: {
+          create: Array.from({ length: 8 }).map((_, i) => ({
+            title: `Module ${i + 1}: ${item.title} deep dive`,
+            order: i + 1,
+            content: "Full lesson transcript including vocabulary lists and grammar rules...",
+            videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            materials: {
+              create: [
+                { title: "Reading Material PDF", fileUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf" },
+                { title: "Audio Practice Link", fileUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" }
+              ]
+            },
+            assignments: {
+              create: [{ title: "Critical Thinking Task", description: "Write 500 words on the lesson topic." }]
+            },
+            exams: {
+              create: [{ title: "Module Competency Exam" }]
+            }
+          }))
+        },
+        announcements: {
+          create: [
+            { title: "Welcome Students!", content: "Get ready for a life-changing experience." },
+            { title: "New Material Uploaded", content: "Check the resources tab for the latest PDF." }
+          ]
+        }
+      },
+      include: { lessons: { include: { exams: true, assignments: true, materials: true } } }
+    });
 
-  // 6. Set Student Appointments (Mon/Wed/Fri)
-  await prisma.appointment.createMany({
-    data: [
-      { enrollmentId: enrollment.id, dayOfWeek: "Monday", startTime: "10:00 AM" },
-      { enrollmentId: enrollment.id, dayOfWeek: "Wednesday", startTime: "10:00 AM" },
-    ]
-  });
+    // --- 4. THE INTERACTION (Enrollments, Progress, Results) ---
+    for (const student of students) {
+      const enrollment = await prisma.enrollment.create({
+        data: {
+          userId: student.id,
+          courseId: course.id,
+          googleMeetLink: "https://meet.google.com/xyz-pdqr-abc",
+          appointments: {
+            create: [
+              { dayOfWeek: "Monday", startTime: "09:00" },
+              { dayOfWeek: "Thursday", startTime: "14:00" }
+            ]
+          }
+        }
+      });
 
-  // 7. Create Lessons
-  const lesson1 = await prisma.lesson.create({
-    data: {
-      title: "Introduction to ORMs",
-      content: "Basics of Object-Relational Mapping.",
-      order: 1,
-      courseId: course.id,
-      videoUrl: "https://www.youtube.com/watch?v=reP1px1fshA",
-    },
-  });
+      // Populate random progress for each student
+      for (let j = 0; j < 4; j++) {
+        const lesson = course.lessons[j];
+        await prisma.userProgress.create({ data: { userId: student.id, lessonId: lesson.id, completed: true } });
 
-  // 8. Create Material for Lesson 1
-  await prisma.material.create({
-    data: {
-      title: "Getting Started PDF",
-      fileUrl: "https://example.com/guide.pdf",
-      lessonId: lesson1.id,
-    },
-  });
+        // Add Exam Results with random scores
+        if (lesson.exams[0]) {
+          await prisma.examResult.create({
+            data: {
+              userId: student.id,
+              examId: lesson.exams[0].id,
+              score: Math.floor(Math.random() * 41) + 60, // 60-100
+              textAnswer: "My understanding of the modal verbs has improved significantly."
+            }
+          });
+        }
 
-  console.log("Seeding finished successfully.");
+        // Add Submission
+        if (lesson.assignments[0]) {
+          await prisma.submission.create({
+            data: {
+              userId: student.id,
+              assignmentId: lesson.assignments[0].id,
+              content: "This is my essay submission. Please provide feedback.",
+              status: "GRADED",
+              score: Math.floor(Math.random() * 20) + 80
+            }
+          });
+        }
+      }
+    }
+  }
+
+  console.log("✅ DATABASE IS FULL TO THE BRIM!");
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .then(async () => { await prisma.$disconnect(); })
+  .catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });
