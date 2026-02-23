@@ -15,10 +15,6 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-<<<<<<< HEAD
-  // Calculate the start of the current week (Sunday)
-=======
->>>>>>> master
   const now = new Date();
   const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
   startOfWeek.setHours(0, 0, 0, 0);
@@ -37,10 +33,6 @@ export default async function DashboardPage() {
         }
       },
       progress: {
-<<<<<<< HEAD
-        // ✅ FIXED: Changed isCompleted to completed to match your schema
-=======
->>>>>>> master
         where: { completed: true },
         orderBy: { updatedAt: 'desc' },
         include: {
@@ -52,37 +44,18 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-<<<<<<< HEAD
-  // Logic for Progress Bar
   const calculateProgress = (courseLessons: any[]) => {
     if (courseLessons.length === 0) return 0;
-    const completedIds = new Set(user.progress.map(p => p.lessonId));
-=======
-  const calculateProgress = (courseLessons: any[]) => {
-    if (courseLessons.length === 0) return 0;
-    // Added :any type to 'p'
     const completedIds = new Set(user.progress.map((p: any) => p.lessonId));
->>>>>>> master
     const completedInThisCourse = courseLessons.filter(lesson => completedIds.has(lesson.id)).length;
     return Math.round((completedInThisCourse / courseLessons.length) * 100);
   };
 
-<<<<<<< HEAD
-  // Logic for Weekly Goal
   const weeklyGoal = 5;
-  const lessonsThisWeek = user.progress.filter(p => new Date(p.updatedAt) >= startOfWeek).length;
-
-  return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      {/* HEADER SECTION */}
-=======
-  const weeklyGoal = 5;
-  // Added :any type to 'p'
   const lessonsThisWeek = user.progress.filter((p: any) => new Date(p.updatedAt) >= startOfWeek).length;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
->>>>>>> master
       <div className="bg-slate-900 pt-32 pb-20 px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-end gap-6">
           <div>
@@ -106,11 +79,6 @@ export default async function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-8 -mt-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-<<<<<<< HEAD
-          
-          {/* COURSE LIST */}
-=======
->>>>>>> master
           <div className="lg:col-span-2 space-y-6">
             <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
               <PlayCircle size={18} /> Continue Learning
@@ -123,30 +91,16 @@ export default async function DashboardPage() {
               </div>
             )}
 
-<<<<<<< HEAD
-            {user.enrolledCourses.map((enrollment) => {
-              const course = enrollment.course;
-              const progressPercent = calculateProgress(course.lessons);
-              const imageUrl = course.image;
-=======
-            {/* Added :any to enrollment */}
             {user.enrolledCourses.map((enrollment: any) => {
               const course = enrollment.course;
               const progressPercent = calculateProgress(course.lessons);
-              const firstLessonId = course.lessons[0]?.id;
->>>>>>> master
 
               return (
                 <div key={course.id} className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
                   <div className="flex flex-col md:flex-row gap-8 items-center">
                     <div className="w-full md:w-48 h-32 bg-slate-100 rounded-3xl overflow-hidden shrink-0 relative">
-<<<<<<< HEAD
-                      {imageUrl ? (
-                        <Image src={imageUrl} alt="" fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
-=======
                       {course.image ? (
                         <Image src={course.image} alt="" fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
->>>>>>> master
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-slate-200"><BookOpen className="text-slate-400" /></div>
                       )}
@@ -169,24 +123,12 @@ export default async function DashboardPage() {
                       </div>
 
                       <div className="flex items-center justify-between gap-4 pt-2">
-<<<<<<< HEAD
-                        {/* ✅ FIXED LINK: Points to your classroom page */}
                         <Link 
-                          href={`/learn/${course.id}`} 
+                          href={`/learn/${course.id}/${course.lessons[0]?.id || ''}`} 
                           className="flex items-center justify-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-2xl font-black hover:bg-yellow-400 hover:text-slate-900 transition-all text-sm uppercase tracking-widest"
                         >
                           Open Classroom <ArrowRight size={16} />
                         </Link>
-=======
-
-
-<Link 
-  href={`/learn/${course.id}/${course.lessons[0]?.id || ''}`} 
-  className="flex items-center justify-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-2xl font-black hover:bg-yellow-400 hover:text-slate-900 transition-all text-sm uppercase tracking-widest"
->
-  Open Classroom <ArrowRight size={16} />
-</Link>
->>>>>>> master
                       </div>
                     </div>
                   </div>
@@ -195,57 +137,29 @@ export default async function DashboardPage() {
             })}
           </div>
 
-<<<<<<< HEAD
-          {/* SIDEBAR */}
           <div className="space-y-8">
-            {/* WEEKLY GOAL */}
-=======
-          <div className="space-y-8">
->>>>>>> master
             <div className="bg-yellow-400 rounded-[3rem] p-10 shadow-xl shadow-yellow-400/20">
               <h3 className="text-2xl font-black text-slate-900 mb-2">Weekly Goal</h3>
               <p className="text-slate-900/60 text-xs font-bold uppercase tracking-widest mb-6">
                 {lessonsThisWeek} of {weeklyGoal} lessons completed
               </p>
               <div className="flex gap-2">
-<<<<<<< HEAD
-                {[...Array(weeklyGoal)].map((_, i) => (
-=======
                 {[...Array(weeklyGoal)].map((_, i: number) => (
->>>>>>> master
                   <div key={i} className={`h-12 w-full rounded-2xl border-2 ${i < lessonsThisWeek ? 'bg-slate-900 border-slate-900' : 'border-slate-900/10'}`} />
                 ))}
               </div>
             </div>
 
-<<<<<<< HEAD
-            {/* MILESTONES */}
-=======
->>>>>>> master
             <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm">
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6 border-b pb-4">Recent Milestones</h3>
               <div className="space-y-6">
                 {user.progress.length === 0 && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No activity yet</p>}
-<<<<<<< HEAD
-                {user.progress.slice(0, 5).map((p, i) => (
-                  <div key={i} className="flex gap-4 items-start">
-                    <div className="bg-green-100 text-green-600 p-2 rounded-xl"><CheckCircle size={16} /></div>
-                    <div>
-                      <p className="text-xs font-black text-slate-900 line-clamp-1">
-                        {p.lesson?.title || "Lesson Completed"}
-                      </p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">
-                        {new Date(p.updatedAt).toLocaleDateString()}
-                      </p>
-=======
-                {/* Added :any to p and :number to i */}
                 {user.progress.slice(0, 5).map((p: any, i: number) => (
                   <div key={i} className="flex gap-4 items-start">
                     <div className="bg-green-100 text-green-600 p-2 rounded-xl"><CheckCircle size={16} /></div>
                     <div>
                       <p className="text-xs font-black text-slate-900 line-clamp-1">{p.lesson?.title || "Lesson Completed"}</p>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">{new Date(p.updatedAt).toLocaleDateString()}</p>
->>>>>>> master
                     </div>
                   </div>
                 ))}

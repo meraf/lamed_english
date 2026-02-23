@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-<<<<<<< HEAD
-import { Analytics } from "@vercel/analytics/next"
-=======
->>>>>>> master
 
 // Check these paths carefully:
-import Navbar from "./components/Navbar"; // Relative path is safer here
-import Footer from "./components/Footer"; // Relative path is safer here
-import { Providers } from "./components/Providers"; // Update this too
+import Navbar from "./components/Navbar"; 
+import Footer from "./components/Footer"; 
+import { Providers } from "./components/Providers"; 
 
 const inter = Inter({ subsets: ["latin"] });
 
