@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Analytics } from "@vercel/analytics/next"
 
 // Check these paths carefully:
 import Navbar from "./components/Navbar"; // Relative path is safer here
