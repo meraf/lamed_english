@@ -9,11 +9,15 @@ export default async function PublicCoursesPage({ searchParams }: { searchParams
   const courses = await prisma.course.findMany({
     where: teacherId ? { teacherId } : {},
     include: {
+<<<<<<< HEAD
       teacher: {
         include: {
           user: true // ✅ Need this to get the teacher's name/image from the User model
         }
       },
+=======
+      teacher: { include: { user: true } },
+>>>>>>> master
       _count: { select: { lessons: true } }
     },
     orderBy: { createdAt: 'desc' }
@@ -21,7 +25,10 @@ export default async function PublicCoursesPage({ searchParams }: { searchParams
 
   return (
     <div className="min-h-screen bg-white">
+<<<<<<< HEAD
       {/* Hero Section */}
+=======
+>>>>>>> master
       <section className="bg-slate-900 py-24 px-8 relative overflow-hidden">
         <div className="max-w-7xl mx-auto relative z-10">
           <span className="bg-yellow-400 text-slate-900 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-6 inline-block">
@@ -36,12 +43,18 @@ export default async function PublicCoursesPage({ searchParams }: { searchParams
 
       <main className="max-w-7xl mx-auto px-8 -mt-16 pb-32">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+<<<<<<< HEAD
           {courses.map((course) => (
             <div key={course.id} className="group bg-white rounded-[2.5rem] border border-slate-100 shadow-xl transition-all duration-500 flex flex-col overflow-hidden hover:-translate-y-2">
               
               {/* Course Thumbnail */}
               <div className="h-48 bg-slate-900 relative overflow-hidden">
                  {/* ✅ Changed 'thumbnail' to 'image' to match your schema */}
+=======
+          {courses.map((course: any) => (
+            <div key={course.id} className="group bg-white rounded-[2.5rem] border border-slate-100 shadow-xl transition-all duration-500 flex flex-col overflow-hidden hover:-translate-y-2">
+              <div className="h-48 bg-slate-900 relative overflow-hidden">
+>>>>>>> master
                  {course.image ? (
                    <img src={course.image} alt={course.title} className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-500" />
                  ) : (
@@ -50,13 +63,19 @@ export default async function PublicCoursesPage({ searchParams }: { searchParams
                    </div>
                  )}
               </div>
+<<<<<<< HEAD
 
               {/* Course Content */}
+=======
+>>>>>>> master
               <div className="p-8 flex-grow flex flex-col">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <img 
+<<<<<<< HEAD
                         // ✅ Check teacher.image first, then fallback to teacher.user.image
+=======
+>>>>>>> master
                         src={course.teacher?.image || course.teacher?.user?.image || `https://ui-avatars.com/api/?name=${course.teacher?.user?.name || 'Teacher'}`} 
                         className="w-6 h-6 rounded-full border border-slate-200 object-cover" 
                         alt="Instructor"
@@ -67,15 +86,21 @@ export default async function PublicCoursesPage({ searchParams }: { searchParams
                   </div>
                   <span className="text-[10px] font-black uppercase text-slate-400">{course._count.lessons} Lessons</span>
                 </div>
+<<<<<<< HEAD
 
+=======
+>>>>>>> master
                 <h3 className="text-2xl font-black text-slate-900 mb-3 group-hover:text-yellow-600 transition-colors">
                   {course.title}
                 </h3>
                 <p className="text-slate-500 text-sm leading-relaxed mb-8 line-clamp-2">
                   {course.description}
                 </p>
+<<<<<<< HEAD
 
                 {/* Footer / Price & Action */}
+=======
+>>>>>>> master
                 <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
                   <div>
                     <span className="block text-[10px] font-black text-slate-300 uppercase tracking-widest">Investment</span>
@@ -92,6 +117,7 @@ export default async function PublicCoursesPage({ searchParams }: { searchParams
             </div>
           ))}
         </div>
+<<<<<<< HEAD
 
         {/* Empty State */}
         {courses.length === 0 && (
@@ -102,6 +128,8 @@ export default async function PublicCoursesPage({ searchParams }: { searchParams
             </div>
           </div>
         )}
+=======
+>>>>>>> master
       </main>
     </div>
   );
