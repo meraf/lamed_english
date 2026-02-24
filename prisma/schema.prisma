@@ -216,24 +216,40 @@ model Submission {
 model Exam {
   id        String       @id @default(cuid())
   title     String
+  duration  Int          @default(30) // Duration in minutes
   lessonId  String
   lesson    Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questions Question[]
   results   ExamResult[]
+}
+model Question {
+  id       String   @id @default(cuid())
+  text     String   @db.Text
+  examId   String
+  exam     Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  options  Option[]
+}
+
+model Option {
+  id         String   @id @default(cuid())
+  text       String
+  isCorrect  Boolean  @default(false)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
 model ExamResult {
   id          String   @id @default(cuid())
   userId      String
   examId      String
-  textAnswer  String?  @db.Text
-  fileUrl     String?  
-  score       Float?   
+  answers     Json?    // Store as { "questionId": "optionId" }
+  score       Float?
+  isGraded    Boolean  @default(false)
   createdAt   DateTime @default(now())
   
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
 }
-
 model Announcement {
   id        String             @id @default(cuid())
   title     String

@@ -2,12 +2,15 @@
 import { useState, useRef, useEffect } from "react";
 import { 
   Play, Book, FileText, Bell, PenTool, CheckCircle, 
-  Download, Upload, Lock, ChevronLeft, Video, Eye, X, ExternalLink,
-  Clock, Calendar as CalendarIcon, AlertCircle, Check
+  Download, Upload, Lock, ChevronLeft, Video, X, ExternalLink,
+  Clock, Calendar as CalendarIcon, AlertCircle
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-export default function ClassroomClient({ user, lesson, course }: any) {
+export default function ClassroomClient({ user, lesson, course, enrollment }: any) {
+  const router = useRouter();
+  
   // --- CORE STATE ---
   const [activeTab, setActiveTab] = useState("video");
   const [viewedLessons, setViewedLessons] = useState<string[]>([]);
@@ -18,26 +21,18 @@ export default function ClassroomClient({ user, lesson, course }: any) {
   const [isUploadingTask, setIsUploadingTask] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- EXAM PORTAL STATE ---
+  // --- EXAM PORTAL STATE (Using DB Questions) ---
+  const currentExam = lesson?.exams?.[0];
+  const userResult = currentExam?.results?.[0];
+  const examQuestions = currentExam?.questions || [];
+  
   const [showExamPortal, setShowExamPortal] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(30 * 60); 
   const [examAnswers, setExamAnswers] = useState<Record<number, string>>({});
   const [examSubmitMessage, setExamSubmitMessage] = useState<{text: string, type: 'success' | 'timeout'} | null>(null);
   const [isSubmittingExam, setIsSubmittingExam] = useState(false);
 
-  // MOCK QUESTIONS (Since your schema currently doesn't store individual questions)
-  const mockQuestions = [
-    { id: 1, text: "Which of the following is an auxiliary verb?", options: ["Run", "Beautifully", "Have", "Quickly"] },
-    { id: 2, text: "Identify the correct sentence structure.", options: ["I went to the store.", "Store I went to.", "To the store went I.", "Went I to the store."] },
-    { id: 3, text: "What is the synonym of 'Abundant'?", options: ["Scarce", "Plentiful", "Rare", "Empty"] },
-    { id: 4, text: "Choose the correct spelling.", options: ["Accomodation", "Accommodation", "Acommodation", "Accomodasion"] },
-    { id: 5, text: "Which tense is used in: 'She has been working here for 5 years'?", options: ["Present Perfect", "Present Perfect Continuous", "Past Perfect", "Simple Past"] },
-  ];
-
-  // --- EXAM DB LOGIC ---
-  const currentExam = lesson?.exams?.[0];
-  const userResult = user?.examResults?.find((r: any) => r.examId === currentExam?.id);
   const hasSubmittedExam = !!userResult || examSubmitMessage !== null;
 
   // Grade Color Logic
@@ -46,6 +41,27 @@ export default function ClassroomClient({ user, lesson, course }: any) {
     if (score >= 65) return "text-yellow-500";
     if (score >= 50) return "text-orange-500";
     return "text-red-500";
+  };
+
+  // --- HELPERS ---
+  
+  const getEmbedUrl = (url: string) => {
+    if (!url) return "";
+    if (url.includes("youtube.com/watch?v=")) {
+      return url.replace("watch?v=", "embed/");
+    }
+    if (url.includes("youtu.be/")) {
+      const id = url.split("/").pop();
+      return `https://www.youtube.com/embed/${id}`;
+    }
+    return url;
+  };
+
+  // FIX: Converts URL to absolute and uses the stable Google GView endpoint to bypass connection errors
+  const getSafePreviewUrl = (url: string) => {
+    if (!url) return "";
+    const absoluteUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
+    return `https://docs.google.com/gview?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
   };
 
   // --- PERSISTENCE ---
@@ -102,26 +118,18 @@ export default function ClassroomClient({ user, lesson, course }: any) {
     }, 1500);
   };
 
-  // Helper for safe iframe URLs
-  const getSafePreviewUrl = (url: string) => {
-    if (!url) return "";
-    return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
-  };
-
-  // --- FULLSCREEN EXAM PORTAL RENDER ---
+  // --- FULLSCREEN EXAM PORTAL ---
   if (showExamPortal) {
     return (
       <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col font-sans">
-        {/* Top Header & Navigation Bar */}
         <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between shadow-sm">
           <div>
             <h2 className="text-xl font-black text-slate-900">{currentExam?.title}</h2>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Live Assessment</p>
           </div>
           
-          {/* Question Nav Bubbles */}
           <div className="flex gap-2">
-            {mockQuestions.map((q, idx) => (
+            {examQuestions.map((q: any, idx: number) => (
               <button 
                 key={q.id}
                 onClick={() => setCurrentQuestion(idx)}
@@ -144,37 +152,35 @@ export default function ClassroomClient({ user, lesson, course }: any) {
           </div>
         </header>
 
-        {/* Question Area */}
         <main className="flex-grow flex items-center justify-center p-8">
           <div className="bg-white max-w-3xl w-full p-12 rounded-[2.5rem] shadow-xl border border-slate-100">
-            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Question {currentQuestion + 1} of {mockQuestions.length}</h3>
+            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Question {currentQuestion + 1} of {examQuestions.length}</h3>
             <p className="text-2xl font-black text-slate-900 mb-10 leading-relaxed">
-              {mockQuestions[currentQuestion].text}
+              {examQuestions[currentQuestion]?.text}
             </p>
             
             <div className="space-y-4">
-              {mockQuestions[currentQuestion].options.map((opt, i) => (
+              {examQuestions[currentQuestion]?.options?.map((opt: any, i: number) => (
                 <label key={i} className={`flex items-center gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all ${
-                  examAnswers[currentQuestion] === opt 
+                  examAnswers[currentQuestion] === opt.text 
                     ? 'border-slate-900 bg-slate-50 shadow-sm' 
                     : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50'
                 }`}>
                   <input 
                     type="radio" 
                     name={`q-${currentQuestion}`} 
-                    value={opt}
-                    checked={examAnswers[currentQuestion] === opt}
+                    value={opt.text}
+                    checked={examAnswers[currentQuestion] === opt.text}
                     onChange={(e) => setExamAnswers({...examAnswers, [currentQuestion]: e.target.value})}
                     className="w-5 h-5 accent-slate-900" 
                   />
-                  <span className="font-bold text-slate-700">{opt}</span>
+                  <span className="font-bold text-slate-700">{opt.text}</span>
                 </label>
               ))}
             </div>
           </div>
         </main>
 
-        {/* Bottom Bar */}
         <footer className="bg-white border-t border-slate-200 p-6 flex justify-between items-center px-12">
           <button 
             disabled={currentQuestion === 0}
@@ -184,7 +190,7 @@ export default function ClassroomClient({ user, lesson, course }: any) {
             Previous
           </button>
           
-          {currentQuestion === mockQuestions.length - 1 ? (
+          {currentQuestion === examQuestions.length - 1 ? (
             <button 
               onClick={handleExamManualSubmit}
               disabled={isSubmittingExam}
@@ -217,7 +223,6 @@ export default function ClassroomClient({ user, lesson, course }: any) {
           </Link>
           <h1 className="text-xl font-black leading-tight mb-6">{course?.title}</h1>
 
-          {/* YELLOW MEET BUTTON (Now functional as a link) */}
           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-3xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-yellow-400 rounded-xl text-slate-900 animate-pulse">
@@ -225,18 +230,29 @@ export default function ClassroomClient({ user, lesson, course }: any) {
               </div>
               <span className="text-[10px] font-black text-yellow-700 uppercase tracking-widest">Live Class</span>
             </div>
+            
+            {/* REAL LOGIC: Fetches the Google Meet link from the enrollment object in the database */}
             <a 
-              href={course?.enrollments?.[0]?.googleMeetLink || "https://meet.google.com"} 
-              target="_blank" 
+              href={enrollment?.googleMeetLink || "#"} 
+              target={enrollment?.googleMeetLink ? "_blank" : "_self"}
               rel="noopener noreferrer"
-              className="w-full py-4 bg-yellow-400 hover:bg-yellow-500 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-lg shadow-yellow-200 flex items-center justify-center"
+              onClick={(e) => {
+                if (!enrollment?.googleMeetLink) {
+                  e.preventDefault();
+                  alert("Your teacher hasn't set the Google Meet link for this course enrollment yet.");
+                }
+              }}
+              className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center ${
+                enrollment?.googleMeetLink 
+                  ? "bg-yellow-400 hover:bg-yellow-500 text-slate-900 shadow-lg shadow-yellow-200" 
+                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
+              }`}
             >
-              Join Meet
+              {enrollment?.googleMeetLink ? "Join Meet" : "Link Not Set"}
             </a>
           </div>
         </div>
 
-        {/* LESSON LIST */}
         <nav className="flex-grow overflow-y-auto p-4 space-y-1">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-4 mb-2">Modules</p>
           {course?.lessons?.map((l: any, index: number) => {
@@ -268,7 +284,7 @@ export default function ClassroomClient({ user, lesson, course }: any) {
           
           <h2 className="text-4xl font-black mb-8">IELTS MASTERY 2026</h2>
 
-          {/* TABS IN LINE */}
+          {/* TABS */}
           <div className="flex flex-wrap gap-3 mb-10">
             <TabBtn icon={<Play size={14}/>} label="Video" active={activeTab === 'video'} onClick={() => setActiveTab('video')} />
             <TabBtn icon={<Book size={14}/>} label="Reading" active={activeTab === 'reading'} onClick={() => {setActiveTab('reading'); setIsPreviewing(false)}} />
@@ -277,21 +293,22 @@ export default function ClassroomClient({ user, lesson, course }: any) {
             <TabBtn icon={<Bell size={14}/>} label="News" active={activeTab === 'news'} onClick={() => setActiveTab('news')} />
           </div>
 
-          {/* ========================================= */}
-          {/* UNTOUCHED VIDEO & READING TABS FROM PROMPT */}
-          {/* ========================================= */}
-          
           {/* VIDEO TAB */}
           {activeTab === 'video' && (
             <div className="animate-in fade-in">
               <div className="aspect-video w-full bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl mb-8">
-                <iframe src={lesson?.videoUrl} className="w-full h-full border-0" allowFullScreen />
+                <iframe 
+                  src={getEmbedUrl(lesson?.videoUrl)} 
+                  className="w-full h-full border-0" 
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen 
+                />
               </div>
               <h3 className="text-2xl font-black">{lesson?.title}</h3>
             </div>
           )}
 
-          {/* READING TAB (Fixed Iframe) */}
+          {/* READING TAB */}
           {activeTab === 'reading' && (
             <div className="animate-in slide-in-from-bottom-4">
               {isPreviewing ? (
@@ -323,21 +340,16 @@ export default function ClassroomClient({ user, lesson, course }: any) {
             </div>
           )}
 
-          {/* ========================================= */}
-          {/* NEW REBUILT TABS (EXAM, ASSIGNMENT, NEWS) */}
-          {/* ========================================= */}
-
           {/* EXAM TAB */}
           {activeTab === 'exam' && (
             <div className="max-w-3xl mx-auto animate-in fade-in">
-              {!currentExam ? (
+              {!currentExam || examQuestions.length === 0 ? (
                 <div className="text-center py-20 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
                   <Lock size={48} className="mx-auto text-slate-200 mb-4" />
                   <p className="font-bold text-slate-400 uppercase text-[10px] tracking-widest">No exam for this lesson for now.</p>
                 </div>
               ) : hasSubmittedExam ? (
                 <div className="space-y-6">
-                  {/* Show Submit Message if just submitted */}
                   {examSubmitMessage && (
                     <div className={`p-6 rounded-2xl border flex items-center gap-4 ${
                       examSubmitMessage.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
@@ -350,7 +362,6 @@ export default function ClassroomClient({ user, lesson, course }: any) {
                   <div className="text-center py-20 bg-white rounded-[3rem] shadow-xl border border-slate-100">
                     <CheckCircle size={64} className="mx-auto text-green-500 mb-6" />
                     <h3 className="text-3xl font-black mb-2">Assessment Completed</h3>
-                    
                     {userResult?.score !== null && userResult?.score !== undefined ? (
                       <div className="mt-8">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Final Graded Score</p>
@@ -369,11 +380,11 @@ export default function ClassroomClient({ user, lesson, course }: any) {
                 <div className="bg-white p-12 rounded-[3rem] shadow-xl border border-slate-100 text-center">
                   <PenTool size={48} className="mx-auto text-slate-300 mb-6" />
                   <h2 className="text-3xl font-black text-slate-900 mb-4">{currentExam.title}</h2>
-                  <p className="text-slate-500 mb-10 font-medium">This is a timed assessment. Ensure you have a stable connection. You will have 30 minutes to complete the test once it begins.</p>
+                  <p className="text-slate-500 mb-10 font-medium">This is a timed assessment. Ensure you have a stable connection. You will have 30 minutes to complete the test.</p>
                   <button 
                     onClick={() => {
                       setShowExamPortal(true);
-                      setTimeLeft(30 * 60); // reset timer
+                      setTimeLeft(30 * 60);
                       setCurrentQuestion(0);
                     }}
                     className="px-10 py-5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-yellow-400 hover:text-slate-900 transition-all shadow-lg"
@@ -399,9 +410,7 @@ export default function ClassroomClient({ user, lesson, course }: any) {
                     <div key={a.id} className="bg-white p-10 rounded-[3rem] shadow-xl border border-slate-100">
                       <h2 className="text-3xl font-black mb-4">{a.title}</h2>
                       {a.description && <p className="text-slate-500 mb-8">{a.description}</p>}
-                      
                       <div className="grid md:grid-cols-2 gap-8">
-                        {/* Download Block */}
                         <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-200 flex flex-col items-center justify-center text-center">
                           <Download size={32} className="text-slate-300 mb-4" />
                           <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Task Instructions</p>
@@ -409,11 +418,8 @@ export default function ClassroomClient({ user, lesson, course }: any) {
                             Download Assignment
                           </a>
                         </div>
-
-                        {/* Upload Block */}
                         <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
                           <input type="file" ref={fileInputRef} onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="hidden" />
-                          
                           {!selectedFile ? (
                             <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center gap-3 w-full">
                               <Upload size={32} className="text-indigo-500" />
@@ -453,63 +459,30 @@ export default function ClassroomClient({ user, lesson, course }: any) {
           {/* NEWS TAB */}
           {activeTab === 'news' && (
             <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in">
-              
-              {/* Weekly Schedule Board */}
               <div className="space-y-6">
                 <div className="flex items-center gap-3 mb-6">
                   <CalendarIcon className="text-slate-900" size={28} />
                   <h2 className="text-2xl font-black text-slate-900">This Week's Schedule</h2>
                 </div>
-                
                 <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white space-y-6">
-                  <div className="flex items-start gap-4 pb-6 border-b border-white/10">
+                   <div className="flex items-start gap-4 pb-6 border-b border-white/10">
                     <div className="bg-yellow-400 text-slate-900 p-3 rounded-2xl flex flex-col items-center justify-center min-w-[60px]">
                       <span className="text-[10px] font-black uppercase">Mon</span>
                       <span className="text-xl font-black">24</span>
                     </div>
                     <div>
                       <h4 className="font-black text-lg">Speaking Practice</h4>
-                      <p className="text-slate-400 font-medium text-sm flex items-center gap-2 mt-1">
-                        <Clock size={14}/> 10:00 AM - 11:30 AM
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4 pb-6 border-b border-white/10">
-                    <div className="bg-white/10 text-white p-3 rounded-2xl flex flex-col items-center justify-center min-w-[60px]">
-                      <span className="text-[10px] font-black uppercase">Wed</span>
-                      <span className="text-xl font-black">26</span>
-                    </div>
-                    <div>
-                      <h4 className="font-black text-lg">Writing Task 2 Deep Dive</h4>
-                      <p className="text-slate-400 font-medium text-sm flex items-center gap-2 mt-1">
-                        <Clock size={14}/> 2:00 PM - 4:00 PM
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="bg-white/10 text-white p-3 rounded-2xl flex flex-col items-center justify-center min-w-[60px]">
-                      <span className="text-[10px] font-black uppercase">Fri</span>
-                      <span className="text-xl font-black">28</span>
-                    </div>
-                    <div>
-                      <h4 className="font-black text-lg">Mock Reading Test</h4>
-                      <p className="text-slate-400 font-medium text-sm flex items-center gap-2 mt-1">
-                        <Clock size={14}/> 10:00 AM - 12:00 PM
-                      </p>
+                      <p className="text-slate-400 font-medium text-sm flex items-center gap-2 mt-1"><Clock size={14}/> 10:00 AM - 11:30 AM</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* General Announcements */}
               <div className="space-y-6">
                 <div className="flex items-center gap-3 mb-6">
                   <Bell className="text-yellow-500" size={28} />
                   <h2 className="text-2xl font-black text-slate-900">Announcements</h2>
                 </div>
-                
                 {!course?.announcements?.length ? (
                   <p className="text-slate-500 italic">No new announcements at this time.</p>
                 ) : (
@@ -527,14 +500,12 @@ export default function ClassroomClient({ user, lesson, course }: any) {
               </div>
             </div>
           )}
-
         </div>
       </main>
     </div>
   );
 }
 
-// Fixed Tab Button to match your Image style exactly
 function TabBtn({ icon, label, active, onClick }: any) {
   return (
     <button onClick={onClick} className={`flex items-center gap-2.5 px-6 py-3.5 rounded-full font-black text-[11px] uppercase tracking-widest transition-all ${
