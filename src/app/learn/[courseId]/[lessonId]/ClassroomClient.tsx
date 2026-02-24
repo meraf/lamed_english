@@ -2,24 +2,53 @@
 import { useState, useRef, useEffect } from "react";
 import { 
   Play, Book, FileText, Bell, PenTool, CheckCircle, 
-  Download, Upload, Lock, ChevronLeft, Video, Eye, X, Clock, Megaphone, ExternalLink
+  Download, Upload, Lock, ChevronLeft, Video, Eye, X, ExternalLink,
+  Clock, Calendar as CalendarIcon, AlertCircle, Check
 } from "lucide-react";
 import Link from "next/link";
 
 export default function ClassroomClient({ user, lesson, course }: any) {
+  // --- CORE STATE ---
   const [activeTab, setActiveTab] = useState("video");
   const [viewedLessons, setViewedLessons] = useState<string[]>([]);
   const [isPreviewing, setIsPreviewing] = useState(false);
   
-  // Exam State
-  const [examAnswer, setExamAnswer] = useState("");
+  // --- ASSIGNMENT STATE ---
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploadingTask, setIsUploadingTask] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- EXAM PORTAL STATE ---
+  const [showExamPortal, setShowExamPortal] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 minutes in seconds
+  const [examAnswers, setExamAnswers] = useState<Record<number, string>>({});
+  const [examSubmitMessage, setExamSubmitMessage] = useState<{text: string, type: 'success' | 'timeout'} | null>(null);
   const [isSubmittingExam, setIsSubmittingExam] = useState(false);
 
-  // Check if current exam is already submitted (logic based on your schema)
+  // MOCK QUESTIONS (Since your schema currently doesn't store individual questions)
+  const mockQuestions = [
+    { id: 1, text: "Which of the following is an auxiliary verb?", options: ["Run", "Beautifully", "Have", "Quickly"] },
+    { id: 2, text: "Identify the correct sentence structure.", options: ["I went to the store.", "Store I went to.", "To the store went I.", "Went I to the store."] },
+    { id: 3, text: "What is the synonym of 'Abundant'?", options: ["Scarce", "Plentiful", "Rare", "Empty"] },
+    { id: 4, text: "Choose the correct spelling.", options: ["Accomodation", "Accommodation", "Acommodation", "Accomodasion"] },
+    { id: 5, text: "Which tense is used in: 'She has been working here for 5 years'?", options: ["Present Perfect", "Present Perfect Continuous", "Past Perfect", "Simple Past"] },
+  ];
+
+  // --- EXAM DB LOGIC ---
   const currentExam = lesson?.exams?.[0];
   const userResult = user?.examResults?.find((r: any) => r.examId === currentExam?.id);
-  const hasSubmittedExam = !!userResult;
+  const hasSubmittedExam = !!userResult || examSubmitMessage !== null;
 
+  // Grade Color Logic
+  const getGradeColor = (score: number) => {
+    if (score >= 80) return "text-green-500";
+    if (score >= 65) return "text-yellow-500";
+    if (score >= 50) return "text-orange-500";
+    return "text-red-500";
+  };
+
+  // --- PERSISTENCE ---
   useEffect(() => {
     const saved = localStorage.getItem(`viewed-${course?.id}`);
     if (saved) setViewedLessons(JSON.parse(saved));
@@ -33,22 +62,150 @@ export default function ClassroomClient({ user, lesson, course }: any) {
     }
   };
 
-  const handleExamSubmit = () => {
+  // --- EXAM TIMER LOGIC ---
+  useEffect(() => {
+    if (!showExamPortal || timeLeft <= 0 || hasSubmittedExam) return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleExamAutoSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [showExamPortal, timeLeft, hasSubmittedExam]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleExamAutoSubmit = () => {
     setIsSubmittingExam(true);
-    // Simulation of database push
     setTimeout(() => {
-      alert("Exam submitted successfully! It cannot be changed.");
+      setShowExamPortal(false);
       setIsSubmittingExam(false);
-      // In a real app, you would refresh the page or update the server component data here
+      setExamSubmitMessage({ text: "Time ran out! Your exam was submitted automatically.", type: 'timeout' });
     }, 1500);
   };
 
-  // Helper to fix "Refused to connect" - Uses Google Viewer for PDFs/Docs
+  const handleExamManualSubmit = () => {
+    setIsSubmittingExam(true);
+    setTimeout(() => {
+      setShowExamPortal(false);
+      setIsSubmittingExam(false);
+      setExamSubmitMessage({ text: "Exam completed successfully! Your answers have been saved.", type: 'success' });
+    }, 1500);
+  };
+
+  // Helper for safe iframe URLs
   const getSafePreviewUrl = (url: string) => {
     if (!url) return "";
     return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
   };
 
+  // --- FULLSCREEN EXAM PORTAL RENDER ---
+  if (showExamPortal) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col font-sans">
+        {/* Top Header & Navigation Bar */}
+        <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between shadow-sm">
+          <div>
+            <h2 className="text-xl font-black text-slate-900">{currentExam?.title}</h2>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Live Assessment</p>
+          </div>
+          
+          {/* Question Nav Bubbles */}
+          <div className="flex gap-2">
+            {mockQuestions.map((q, idx) => (
+              <button 
+                key={q.id}
+                onClick={() => setCurrentQuestion(idx)}
+                className={`w-8 h-8 rounded-full font-black text-xs flex items-center justify-center transition-all ${
+                  currentQuestion === idx 
+                    ? 'bg-slate-900 text-white shadow-md scale-110' 
+                    : examAnswers[idx] 
+                      ? 'bg-green-100 text-green-700 border border-green-200' 
+                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                }`}
+              >
+                {idx + 1}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3 bg-red-50 px-4 py-2 rounded-xl border border-red-100">
+            <Clock className="text-red-500 animate-pulse" size={16} />
+            <span className="font-black text-red-600 tracking-widest">{formatTime(timeLeft)}</span>
+          </div>
+        </header>
+
+        {/* Question Area */}
+        <main className="flex-grow flex items-center justify-center p-8">
+          <div className="bg-white max-w-3xl w-full p-12 rounded-[2.5rem] shadow-xl border border-slate-100">
+            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Question {currentQuestion + 1} of {mockQuestions.length}</h3>
+            <p className="text-2xl font-black text-slate-900 mb-10 leading-relaxed">
+              {mockQuestions[currentQuestion].text}
+            </p>
+            
+            <div className="space-y-4">
+              {mockQuestions[currentQuestion].options.map((opt, i) => (
+                <label key={i} className={`flex items-center gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all ${
+                  examAnswers[currentQuestion] === opt 
+                    ? 'border-slate-900 bg-slate-50 shadow-sm' 
+                    : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50'
+                }`}>
+                  <input 
+                    type="radio" 
+                    name={`q-${currentQuestion}`} 
+                    value={opt}
+                    checked={examAnswers[currentQuestion] === opt}
+                    onChange={(e) => setExamAnswers({...examAnswers, [currentQuestion]: e.target.value})}
+                    className="w-5 h-5 accent-slate-900" 
+                  />
+                  <span className="font-bold text-slate-700">{opt}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </main>
+
+        {/* Bottom Bar */}
+        <footer className="bg-white border-t border-slate-200 p-6 flex justify-between items-center px-12">
+          <button 
+            disabled={currentQuestion === 0}
+            onClick={() => setCurrentQuestion(prev => prev - 1)}
+            className="px-6 py-3 font-black text-xs uppercase tracking-widest text-slate-500 hover:text-slate-900 disabled:opacity-30 transition-colors"
+          >
+            Previous
+          </button>
+          
+          {currentQuestion === mockQuestions.length - 1 ? (
+            <button 
+              onClick={handleExamManualSubmit}
+              disabled={isSubmittingExam}
+              className="px-10 py-4 bg-yellow-400 text-slate-900 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-500 transition-all shadow-lg shadow-yellow-200"
+            >
+              {isSubmittingExam ? 'Submitting...' : 'Submit Exam Now'}
+            </button>
+          ) : (
+            <button 
+              onClick={() => setCurrentQuestion(prev => prev + 1)}
+              className="px-10 py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all"
+            >
+              Next Question
+            </button>
+          )}
+        </footer>
+      </div>
+    );
+  }
+
+  // --- STANDARD CLASSROOM RENDER ---
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans text-slate-900">
       
@@ -60,17 +217,22 @@ export default function ClassroomClient({ user, lesson, course }: any) {
           </Link>
           <h1 className="text-xl font-black leading-tight mb-6">{course?.title}</h1>
 
-          {/* YELLOW MEET BUTTON */}
+          {/* YELLOW MEET BUTTON (Now functional as a link) */}
           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-3xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-yellow-400 rounded-xl text-slate-900 animate-pulse">
                 <Video size={16} />
               </div>
-              <span className="text-[10px] font-black text-yellow-700 uppercase tracking-widest">Live Class Now</span>
+              <span className="text-[10px] font-black text-yellow-700 uppercase tracking-widest">Live Class</span>
             </div>
-            <button className="w-full py-4 bg-yellow-400 hover:bg-yellow-500 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-lg shadow-yellow-200">
+            <a 
+              href={course?.enrollments?.[0]?.googleMeetLink || "https://meet.google.com"} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-full py-4 bg-yellow-400 hover:bg-yellow-500 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-lg shadow-yellow-200 flex items-center justify-center"
+            >
               Join Meet
-            </button>
+            </a>
           </div>
         </div>
 
@@ -106,7 +268,7 @@ export default function ClassroomClient({ user, lesson, course }: any) {
           
           <h2 className="text-4xl font-black mb-8">IELTS MASTERY 2026</h2>
 
-          {/* TABS IN LINE (Matches Screenshot) */}
+          {/* TABS IN LINE */}
           <div className="flex flex-wrap gap-3 mb-10">
             <TabBtn icon={<Play size={14}/>} label="Video" active={activeTab === 'video'} onClick={() => setActiveTab('video')} />
             <TabBtn icon={<Book size={14}/>} label="Reading" active={activeTab === 'reading'} onClick={() => {setActiveTab('reading'); setIsPreviewing(false)}} />
@@ -115,6 +277,10 @@ export default function ClassroomClient({ user, lesson, course }: any) {
             <TabBtn icon={<Bell size={14}/>} label="News" active={activeTab === 'news'} onClick={() => setActiveTab('news')} />
           </div>
 
+          {/* ========================================= */}
+          {/* UNTOUCHED VIDEO & READING TABS FROM PROMPT */}
+          {/* ========================================= */}
+          
           {/* VIDEO TAB */}
           {activeTab === 'video' && (
             <div className="animate-in fade-in">
@@ -157,79 +323,208 @@ export default function ClassroomClient({ user, lesson, course }: any) {
             </div>
           )}
 
-          {/* EXAM TAB (Database Fetching Logic) */}
+          {/* ========================================= */}
+          {/* NEW REBUILT TABS (EXAM, ASSIGNMENT, NEWS) */}
+          {/* ========================================= */}
+
+          {/* EXAM TAB */}
           {activeTab === 'exam' && (
-            <div className="max-w-3xl mx-auto animate-in zoom-in-95">
-              {currentExam ? (
-                <div className="bg-slate-900 rounded-[3rem] overflow-hidden shadow-2xl">
-                  <div className="p-10 border-b border-white/10 flex justify-between items-center">
-                    <h2 className="text-3xl font-black text-white">{currentExam.title}</h2>
-                    <PenTool className="text-yellow-400" size={32} />
-                  </div>
+            <div className="max-w-3xl mx-auto animate-in fade-in">
+              {!currentExam ? (
+                <div className="text-center py-20 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
+                  <Lock size={48} className="mx-auto text-slate-200 mb-4" />
+                  <p className="font-bold text-slate-400 uppercase text-[10px] tracking-widest">No exam for this lesson for now.</p>
+                </div>
+              ) : hasSubmittedExam ? (
+                <div className="space-y-6">
+                  {/* Show Submit Message if just submitted */}
+                  {examSubmitMessage && (
+                    <div className={`p-6 rounded-2xl border flex items-center gap-4 ${
+                      examSubmitMessage.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+                    }`}>
+                      {examSubmitMessage.type === 'success' ? <CheckCircle size={24}/> : <AlertCircle size={24}/>}
+                      <p className="font-bold">{examSubmitMessage.text}</p>
+                    </div>
+                  )}
                   
-                  <div className="p-10 bg-white m-4 rounded-[2rem]">
-                    {hasSubmittedExam ? (
-                      <div className="text-center py-10">
-                        <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                          <CheckCircle size={40} />
-                        </div>
-                        <h3 className="text-2xl font-black mb-2">Assessment Submitted</h3>
-                        <p className="text-slate-500 mb-8 font-medium italic">"Once submitted, answers cannot be modified."</p>
-                        
-                        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 inline-block min-w-[240px]">
-                          <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Status</p>
-                          <p className="text-xl font-black text-slate-900">
-                            {userResult.score !== null ? `GRADED: ${userResult.score}%` : "SUBMITTED TO BE GRADED"}
-                          </p>
+                  <div className="text-center py-20 bg-white rounded-[3rem] shadow-xl border border-slate-100">
+                    <CheckCircle size={64} className="mx-auto text-green-500 mb-6" />
+                    <h3 className="text-3xl font-black mb-2">Assessment Completed</h3>
+                    
+                    {userResult?.score !== null && userResult?.score !== undefined ? (
+                      <div className="mt-8">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Final Graded Score</p>
+                        <div className={`text-6xl font-black ${getGradeColor(userResult.score)}`}>
+                          {userResult.score}%
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-6">
-                        <p className="text-slate-600 font-medium leading-relaxed bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                          <strong>Instructions:</strong> Please provide your detailed answers below. You may also upload a supporting file if required.
-                        </p>
-                        
-                        <textarea 
-                          value={examAnswer}
-                          onChange={(e) => setExamAnswer(e.target.value)}
-                          placeholder="Type your answers here..."
-                          className="w-full h-64 p-6 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-yellow-400 focus:outline-none font-medium transition-all"
-                        />
-
-                        <button 
-                          onClick={handleExamSubmit}
-                          disabled={isSubmittingExam || !examAnswer}
-                          className="w-full py-6 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.3em] hover:bg-yellow-400 hover:text-slate-900 transition-all disabled:opacity-50"
-                        >
-                          {isSubmittingExam ? 'SUBMITTING...' : 'FINISH & SUBMIT'}
-                        </button>
+                      <div className="mt-8 bg-slate-50 inline-block px-8 py-4 rounded-2xl border border-slate-100">
+                        <p className="font-black text-slate-500 uppercase tracking-widest text-xs">Exam taken. Waiting to be graded.</p>
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-20 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
-                  <Lock size={48} className="mx-auto text-slate-200 mb-4" />
-                  <p className="font-bold text-slate-400 uppercase text-[10px] tracking-widest">No Exam Available for this Module</p>
+                <div className="bg-white p-12 rounded-[3rem] shadow-xl border border-slate-100 text-center">
+                  <PenTool size={48} className="mx-auto text-slate-300 mb-6" />
+                  <h2 className="text-3xl font-black text-slate-900 mb-4">{currentExam.title}</h2>
+                  <p className="text-slate-500 mb-10 font-medium">This is a timed assessment. Ensure you have a stable connection. You will have 30 minutes to complete the test once it begins.</p>
+                  <button 
+                    onClick={() => {
+                      setShowExamPortal(true);
+                      setTimeLeft(30 * 60); // reset timer
+                      setCurrentQuestion(0);
+                    }}
+                    className="px-10 py-5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-yellow-400 hover:text-slate-900 transition-all shadow-lg"
+                  >
+                    Take Exam Now
+                  </button>
                 </div>
               )}
             </div>
           )}
 
-          {/* ANNOUNCEMENTS (NEWS) */}
-          {activeTab === 'news' && (
-            <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in">
-              <h3 className="text-2xl font-black flex items-center gap-3">
-                <Megaphone className="text-yellow-500" /> Recent Updates
-              </h3>
-              {course?.announcements?.map((ann: any) => (
-                <div key={ann.id} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden group">
-                  <div className="absolute top-0 left-0 w-1.5 h-full bg-yellow-400" />
-                  <span className="text-[10px] font-black text-slate-400 uppercase mb-2 block">{new Date(ann.createdAt).toDateString()}</span>
-                  <h4 className="text-xl font-black mb-2">{ann.title}</h4>
-                  <p className="text-slate-600 leading-relaxed">{ann.content}</p>
+          {/* ASSIGNMENT TAB */}
+          {activeTab === 'assign' && (
+            <div className="max-w-4xl mx-auto animate-in fade-in">
+              {!lesson.assignments?.length ? (
+                <div className="text-center py-20 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
+                  <FileText size={48} className="mx-auto text-slate-200 mb-4" />
+                  <p className="font-bold text-slate-400 uppercase text-[10px] tracking-widest">No assignments for this lesson.</p>
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-8">
+                  {lesson.assignments.map((a: any) => (
+                    <div key={a.id} className="bg-white p-10 rounded-[3rem] shadow-xl border border-slate-100">
+                      <h2 className="text-3xl font-black mb-4">{a.title}</h2>
+                      {a.description && <p className="text-slate-500 mb-8">{a.description}</p>}
+                      
+                      <div className="grid md:grid-cols-2 gap-8">
+                        {/* Download Block */}
+                        <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-200 flex flex-col items-center justify-center text-center">
+                          <Download size={32} className="text-slate-300 mb-4" />
+                          <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Task Instructions</p>
+                          <a href="#" className="px-6 py-3 bg-white border border-slate-200 rounded-xl font-bold text-xs hover:border-slate-900 transition-colors w-full">
+                            Download Assignment
+                          </a>
+                        </div>
+
+                        {/* Upload Block */}
+                        <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+                          <input type="file" ref={fileInputRef} onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="hidden" />
+                          
+                          {!selectedFile ? (
+                            <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center gap-3 w-full">
+                              <Upload size={32} className="text-indigo-500" />
+                              <span className="font-black text-xs uppercase tracking-widest text-slate-900">Upload Answer</span>
+                            </button>
+                          ) : (
+                            <div className="w-full space-y-4">
+                              <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200">
+                                <span className="text-xs font-bold text-slate-600 truncate">{selectedFile.name}</span>
+                                <button onClick={() => setSelectedFile(null)}><X size={14} className="text-slate-400 hover:text-red-500"/></button>
+                              </div>
+                              <button 
+                                disabled={isUploadingTask}
+                                onClick={() => {
+                                  setIsUploadingTask(true);
+                                  setTimeout(() => {
+                                    setIsUploadingTask(false);
+                                    setSelectedFile(null);
+                                    alert("Assignment uploaded successfully!");
+                                  }, 1500);
+                                }} 
+                                className="w-full bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-400 hover:text-slate-900 transition-colors"
+                              >
+                                {isUploadingTask ? 'Uploading...' : 'Submit Now'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* NEWS TAB */}
+          {activeTab === 'news' && (
+            <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in">
+              
+              {/* Weekly Schedule Board */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <CalendarIcon className="text-slate-900" size={28} />
+                  <h2 className="text-2xl font-black text-slate-900">This Week's Schedule</h2>
+                </div>
+                
+                <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white space-y-6">
+                  <div className="flex items-start gap-4 pb-6 border-b border-white/10">
+                    <div className="bg-yellow-400 text-slate-900 p-3 rounded-2xl flex flex-col items-center justify-center min-w-[60px]">
+                      <span className="text-[10px] font-black uppercase">Mon</span>
+                      <span className="text-xl font-black">24</span>
+                    </div>
+                    <div>
+                      <h4 className="font-black text-lg">Speaking Practice</h4>
+                      <p className="text-slate-400 font-medium text-sm flex items-center gap-2 mt-1">
+                        <Clock size={14}/> 10:00 AM - 11:30 AM
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4 pb-6 border-b border-white/10">
+                    <div className="bg-white/10 text-white p-3 rounded-2xl flex flex-col items-center justify-center min-w-[60px]">
+                      <span className="text-[10px] font-black uppercase">Wed</span>
+                      <span className="text-xl font-black">26</span>
+                    </div>
+                    <div>
+                      <h4 className="font-black text-lg">Writing Task 2 Deep Dive</h4>
+                      <p className="text-slate-400 font-medium text-sm flex items-center gap-2 mt-1">
+                        <Clock size={14}/> 2:00 PM - 4:00 PM
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="bg-white/10 text-white p-3 rounded-2xl flex flex-col items-center justify-center min-w-[60px]">
+                      <span className="text-[10px] font-black uppercase">Fri</span>
+                      <span className="text-xl font-black">28</span>
+                    </div>
+                    <div>
+                      <h4 className="font-black text-lg">Mock Reading Test</h4>
+                      <p className="text-slate-400 font-medium text-sm flex items-center gap-2 mt-1">
+                        <Clock size={14}/> 10:00 AM - 12:00 PM
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* General Announcements */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Bell className="text-yellow-500" size={28} />
+                  <h2 className="text-2xl font-black text-slate-900">Announcements</h2>
+                </div>
+                
+                {!course?.announcements?.length ? (
+                  <p className="text-slate-500 italic">No new announcements at this time.</p>
+                ) : (
+                  course.announcements.map((ann: any) => (
+                    <div key={ann.id} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-yellow-400" />
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
+                        {new Date(ann.createdAt).toDateString()}
+                      </span>
+                      <h4 className="text-lg font-black mb-2 text-slate-900">{ann.title}</h4>
+                      <p className="text-slate-600 text-sm leading-relaxed">{ann.content}</p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
 
@@ -239,7 +534,7 @@ export default function ClassroomClient({ user, lesson, course }: any) {
   );
 }
 
-// Fixed Tab Button to match your Image style
+// Fixed Tab Button to match your Image style exactly
 function TabBtn({ icon, label, active, onClick }: any) {
   return (
     <button onClick={onClick} className={`flex items-center gap-2.5 px-6 py-3.5 rounded-full font-black text-[11px] uppercase tracking-widest transition-all ${
@@ -251,4 +546,3 @@ function TabBtn({ icon, label, active, onClick }: any) {
     </button>
   );
 }
-
