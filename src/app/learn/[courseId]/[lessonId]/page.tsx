@@ -17,12 +17,12 @@ export default async function LearnPage({ params }: { params: Promise<{ courseId
 
   const user = await prisma.user.findUnique({
     where: { email: session.user.email },
+    include: { progress: true } // Progress needs to be included for frontend checks
   });
 
   if (!user) notFound();
 
   // 3. Fetch lesson with deep nested exam questions and options
-  // This matches the structure seen in your error log
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     include: {
